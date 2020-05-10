@@ -1,4 +1,4 @@
-from pygenn.genn_model import create_custom_neuron_class
+from pygenn.genn_model import create_custom_weight_update_class
 
 fusi_model = create_custom_weight_update_class(
     "fusi_model",

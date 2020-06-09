@@ -1,3 +1,20 @@
+"""
+Integrate-and-fire neuron with linear leak
+Note that the reset dynamics are specified within `sim_code`,
+but typically they should be placed in `reset_code`
+Parameters: Vtheta -> Reset threshold
+            lambda -> Leak constant
+            Vrest -> Resting value of membrane potential
+            Vreset -> Reset value of membrane potential
+Variables: V -> Membrane potential
+
+Neuron model from:
+J. M. Brader, W. Senn and S. Fusi,
+"Learning Real-World Stimuli in a Neural Network with Spike-Driven Synaptic Dynamics,"
+in Neural Computation, vol. 19, no. 11, pp. 2881-2912, 2007,
+doi: 10.1162/neco.2007.19.11.2881.
+"""
+
 from pygenn.genn_model import create_custom_neuron_class
 
 if_model = create_custom_neuron_class(

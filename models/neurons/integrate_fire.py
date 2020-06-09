@@ -3,7 +3,7 @@ Integrate-and-fire neuron with linear leak
 Note that the reset dynamics are specified within `sim_code`,
 but typically they should be placed in `reset_code`
 Parameters: Vtheta -> Reset threshold
-            lambda -> Leak constant
+            lambda -> Leak / membrane potential decay constant
             Vrest -> Resting value of membrane potential
             Vreset -> Reset value of membrane potential
 Variables: V -> Membrane potential

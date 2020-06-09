@@ -1,7 +1,10 @@
 """
 Leaky Integrate-and-fire neuron
-Parameters:
-Variables:
+Parameters: Urest -> Resting value of membrane potential
+            Tmem -> Time constant for membrane potential decay
+            Tsyn -> Time constant for synaptic current decay
+            Uthr -> Reset threshold
+Variables: U -> Membrane potential
 
 Neuron model from:
 F. Zenke and S. Ganguli,

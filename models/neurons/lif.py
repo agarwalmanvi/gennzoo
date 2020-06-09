@@ -27,6 +27,9 @@ lif_model = create_custom_neuron_class(
     threshold_condition_code="$(U) >= $(Uthr)"
 )
 
-LIF_PARAMS = {}
+LIF_PARAMS = {"Urest": -60,
+              "Tmem": 10,
+              "Tsyn": 5,
+              "Uthr": -50}
 
-lif_init = {}
+lif_init = {"U": -60}

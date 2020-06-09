@@ -12,15 +12,19 @@ doi: 10.1162/neco_a_01086
 
 from pygenn.genn_model import create_custom_neuron_class
 
+# TODO refractory period
 lif_model = create_custom_neuron_class(
     "lif_model",
-    param_names=[],
-    var_name_types=[],
+    param_names=["Urest", "Tmem", "Tsyn", "Uthr"],
+    var_name_types=["U"],
     sim_code="""
+    $(U) += (($(Urest) - $(U) + $(Isyn)) / $(Tmem)) * DT;
+    $(Isyn) -= ($(Isyn) / $(Tsyn)) * DT; // This seems wrong
     """,
     reset_code="""
+    $(U) = $(Urest);
     """,
-    threshold_condition_code=""
+    threshold_condition_code="$(U) >= $(Uthr)"
 )
 
 LIF_PARAMS = {}

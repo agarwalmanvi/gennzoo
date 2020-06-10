@@ -20,8 +20,6 @@ in Neural Computation, vol. 30, no. 6, pp. 1514-1541, 2018,
 doi: 10.1162/neco_a_01086
 """
 
-from pygenn.genn_model import create_custom_neuron_class
-
 LIF_PARAMS = {"C": 1.0,
               "TauM": 10,
               "Vrest": -60,

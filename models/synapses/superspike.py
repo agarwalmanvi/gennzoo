@@ -14,9 +14,9 @@ superspike_model = create_custom_weight_update_class(
     synapse_dynamics_code=
     """
     // Filtered Hebbian term
-    const scalar p = z_tilda_pre * sigma_prime_post;
-    p *= exp(- DT / t_rise);
-    lambda += ( (- p + heb_term) / t_decay ) * DT;
+    e += $(z_tilda_pre) * $(sigma_prime_post)
+    e *= exp(- DT / $(t_rise));
+    lambda += ( (- lambda + e) / $(t_decay)) * DT;
     // Output error signal for precisely timed spikes
     if (sT_post == t && spike_occurs == False) {
         const scalar mismatch = -1.0
@@ -26,6 +26,8 @@ superspike_model = create_custom_weight_update_class(
         const scalar mismatch = 0.0
     }
     error = alpha * mismatch;
+    
+    error = e_post;
     // calculate learning rate r
     g = lambda * error;
     upsilon = fmax(upsilon * exp( - DT / tau_rms) , g * g)

@@ -25,6 +25,9 @@ lif_model = create_custom_neuron_class(
     // filtered partial derivative
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
+    
+        
+    }
     """,
     reset_code="""
     $(V) = $(Vrest);

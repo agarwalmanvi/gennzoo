@@ -2,28 +2,32 @@ from pygenn.genn_model import create_custom_weight_update_class
 
 superspike_model = create_custom_weight_update_class(
     "superspike_model",
-    param_names=["t_rise", "t_decay", "beta", "Vthresh"],
-    var_name_types=[("w", "scalar"), ("z", "scalar"), ("z_tilda", "scalar"), ("h", "scalar"),
-                    ("sigma_prime", "scalar"), ("z_der", "scalar"), ("z_tilda_der", "scalar")],
+    param_names=[],
+    var_name_types=[("w", "scalar"), ("e", "scalar"), ("spike_occurs", "scalar")],
     sim_code=
     """
-    $(addToInSyn, $(w));
-    // presynaptic trace (3.1)
-    z += ((-z / t_rise) + Isyn) * DT;
-    z_tilda += ((-z_tilda + z) / t_decay) * DT;
-    // surrogate partial derivative (3.2)
-    h = beta * (V_post - Vthresh);
-    sigma_prime = 1 / (pow(1 + abs(h), 2));
-    z_der += ((-z_der / t_rise) + sigma_prime) * DT;
-    z_tilda_der += ((-z_tilda_der + z_der) / t_decay) * DT;
-    // output error signal
-    
+    $(addToInSyn, $(w));    
     """,
     post_spike_code=
-    """"""
+    """
+    """,
+    synapse_dynamics_code=
+    """
+    // Filtered Hebbian term
+    const scalar p = z_tilda_pre * sigma_prime_post;
+    p *= exp(- DT / t_rise);
+    lambda += ( (- p + heb_term) / t_decay ) * DT;
+    // Output error signal for precisely timed spikes
+    if (sT_post == t && spike_occurs == False) {
+        const scalar mismatch = -1.0
+    } else if (sT_post != t && spike_occurs == True) {
+        const scalar mismatch = 1.0
+    } else {
+        const scalar mismatch = 0.0
+    }
+    error = alpha * mismatch;
+    """,
+    is_post_spike_time_required=True
 )
 
-SUPERSPIKE_PARAMS = {"t_rise": 5,
-                     "t_decay": 10,
-                     "beta": 1,
-                     "Vthresh": -50}
+SUPERSPIKE_PARAMS = {}

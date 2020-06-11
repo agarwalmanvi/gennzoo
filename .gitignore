@@ -4,3 +4,5 @@ models/__pycache__/
 __pycache__/
 .ipynb_checkpoints
 fig1_CODE
+superspike_CODE
+*.png

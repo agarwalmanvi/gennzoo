@@ -26,14 +26,17 @@ superspike_model = create_custom_weight_update_class(
         const scalar mismatch = 0.0
     }
     error = alpha * mismatch;
-    // insert code to calculate learning rate r
+    // calculate learning rate r
+    g = lambda * error;
+    upsilon = fmax(upsilon * exp( - DT / tau_rms) , g * g)
+    r = r0 / sqrt(upsilon);
     // at each time step, calculate m
     if (t % 500) {
         w += r * m;
         w = fmin(wmax, fmax(wmin, w));
         m = 0.0;
     }
-    m += lambda * error;
+    m += g;
     """,
     is_post_spike_time_required=True
 )

@@ -60,6 +60,7 @@ model.load()
 # Simulate
 
 spikeTimes_view = ssa.extra_global_params['spikeTimes'].view
+start_spike_view = ssa.vars['startSpike'].view
 
 while model.timestep < (PRESENT_TIMESTEPS * REPEATS):
     # Calculate the timestep within the presentation
@@ -78,6 +79,9 @@ while model.timestep < (PRESENT_TIMESTEPS * REPEATS):
             spikeTimes_view[:] = spikeTimes
             model.push_extra_global_param_to_device("SSA", "spikeTimes")
 
+            start_spike_view[:] = start_spike
+            model.push_var_to_device("SSA", "startSpike")
+
         # print(spikeTimes)
 
     model.step_time()
@@ -95,19 +99,3 @@ while model.timestep < (PRESENT_TIMESTEPS * REPEATS):
         fig, axis = plt.subplots()
         axis.scatter(spike_times, spike_ids, color="red")
         plt.savefig("repeat" + str(repeat) + ".png")
-
-# while model.t < 500.0:
-#     model.step_time()
-#     model.pull_current_spikes_from_device("SSA")
-#
-#     times = np.ones_like(ssa.current_spikes) * model.t
-#     spike_ids = np.hstack((spike_ids, ssa.current_spikes))
-#     spike_times = np.hstack((spike_times, times))
-#
-# # Plot for verification
-# fig,axis = plt.subplots()
-# for i, n in enumerate(poisson_spikes):
-#     axis.scatter(n, [i] * len(n), color="blue", label=("Offline" if i == 0 else None))
-# axis.scatter(spike_times, spike_ids, color="red", label="GeNN")
-# axis.legend()
-# plt.show()

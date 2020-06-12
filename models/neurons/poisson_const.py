@@ -5,14 +5,15 @@ import numpy as np
 poisson_const = create_custom_neuron_class(
     "poisson_const",
     param_names=[],
-    var_name_types=[("counter", "scalar")],
+    var_name_types=[("counter", "int"), ("item", "int")],
     sim_code="""
-    printf(to_string($(arr)[$(counter)]));
+    $(item) = $(arr)[$(counter)];
     $(counter) += 1;
     """,
-    threshold_condition_code="")
+    extra_global_params=[("arr", "int*")])
 
-poisson_const_init = {"counter": 0}
+poisson_const_init = {"counter": 0,
+                      "item": 0}
 
 model = genn_model.GeNNModel("float", "spike_source_array")
 model.dT = 1.0
@@ -24,5 +25,10 @@ ssa.set_extra_global_param("arr", arr)
 model.build()
 model.load()
 
-while model.timestep < 3.0:
-    model.timestep()
+while model.timestep < 4.0:
+
+    model.step_time()
+
+    model.pull_var_from_device("ssa", "item")
+    i = ssa.vars["item"].view
+    print(i)

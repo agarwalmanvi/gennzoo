@@ -25,10 +25,17 @@ lif_model = create_custom_neuron_class(
     // filtered partial derivative
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
-    if ($(t) == 71) {
-    }
-        
-    }
+    // error
+    const scalar S_pred = $(spike_times)[$(t)];
+    const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
+    const scalar mismatch = S_pred - S_real;
+    $(err) += ( - $(err) / $(t_rise) + mismatch ) * DT;
+    $(err_tilda) = ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
+    // normalize to unity to give final error - take approach 1
+    const scalar norm_factor = 1.0 / (- exp(- $(t_peak) / $(t_rise)) + exp(- $(t_peak) / $(t_decay)));
+    // possible to make norm_factor a parameter since it's basically an expression containing only constants
+    $(e) = $(err_tilda) / $(norm_factor);
+    // should the normalized error be assigned back to err_tilda? i.e. is the normalization a part of the filter alpha?
     """,
     reset_code="""
     $(V) = $(Vrest);
@@ -39,8 +46,11 @@ lif_model = create_custom_neuron_class(
     derived_params=[
         ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
         ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])())
-    ]
+    ],
+    extra_global_params=[("spike_times", "scalar*")]
 )
+
+## spike_times should be a binary array that captures the target binary spike train
 
 LIF_PARAMS = {"C": 1.0,
               "Tau_mem": 10,

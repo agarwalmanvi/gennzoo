@@ -30,7 +30,7 @@ lif_model = create_custom_neuron_class(
     const scalar S_pred = $(spike_times)[(int)round($(t) / DT)];
     const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
     const scalar mismatch = S_pred - S_real;
-    $(err) += ( - $(err) / $(t_rise) + mismatch ) * DT;
+    $(err) += ( (- $(err) / $(t_rise)) + mismatch ) * DT;
     $(err_tilda) = ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
     // normalize to unity to give final error - take approach 1
     // const scalar norm_factor = 1.0 / (- exp(- $(t_peak) / $(t_rise)) + exp(- $(t_peak) / $(t_decay)));
@@ -54,13 +54,13 @@ lif_model = create_custom_neuron_class(
 ## spike_times should be a binary array that captures the target binary spike train
 
 LIF_PARAMS = {"C": 1.0,
-              "Tau_mem": 10,
-              "Vrest": -60,
-              "Vthresh": -50,
+              "Tau_mem": 10.0,
+              "Vrest": -60.0,
+              "Vthresh": -50.0,
               "Ioffset": 0.0,
               "TauRefrac": 5.0,
-              "t_rise": 5,
-              "t_decay": 10,
+              "t_rise": 5.0,
+              "t_decay": 10.0,
               "beta": 1.0}
 
 LIF_PARAMS["t_peak"] = ( (LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_PARAMS["t_decay"] - LIF_PARAMS["t_rise"]) ) * log(LIF_PARAMS["t_decay"] / LIF_PARAMS["t_rise"])

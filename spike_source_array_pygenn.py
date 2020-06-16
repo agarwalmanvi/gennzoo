@@ -15,7 +15,7 @@ TRIALS = 1
 # Generate poisson spike trains
 poisson_spikes = []
 interval = 500
-freq = 10
+freq = 1
 spike_dt = 0.001
 N_INPUT = 100
 compare_num = freq * spike_dt
@@ -132,6 +132,8 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
         out_V = np.empty(0)
 
+        wts_sum = np.empty(0)
+
         if trial != 0:
             spikeTimes += PRESENT_TIMESTEPS
 
@@ -156,6 +158,10 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     model.pull_var_from_device("out", "V")
     out_V = np.hstack((out_V, out.vars["V"].view))
 
+    model.pull_var_from_device("inp2out", "w")
+    weights = inp2out.get_var_values("w")
+    wts_sum = np.append(wts_sum, np.sum(weights))
+
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
 
         # print(spike_times)
@@ -167,7 +173,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
         print("Creating raster plot")
 
-        fig, axes = plt.subplots(3, sharex=True)
+        fig, axes = plt.subplots(4, sharex=True)
         fig.tight_layout(pad=2.0)
 
         timesteps = list(range(int(PRESENT_TIMESTEPS)))
@@ -178,6 +184,8 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         axes[1].set_title("Membrane potential of output neuron")
         axes[2].scatter(spike_times, spike_ids, s=20)
         axes[2].set_title("Input spikes")
+        axes[3].plot(timesteps, wts_sum)
+        axes[3].set_title("Sum of weights of synapses")
 
         axes[-1].set_xlabel("Time [ms]")
 

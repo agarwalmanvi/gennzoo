@@ -18,7 +18,7 @@ superspike_model = create_custom_weight_update_class(
     $(upsilon) = fmax($(upsilon) * $(ExpRMS) , g * g);
     // at each time step, calculate m
     $(m) += g;
-    if ((int)round($(t)) % 500 == 0) {
+    if ((int)round($(t)) % 500 == 0 && (int)round($(t)) != 0) {
         const scalar r = $(r0) / sqrt($(upsilon));
         $(w) += r * $(m);
         $(w) = fmin($(wmax), fmax($(wmin), $(w)));
@@ -26,7 +26,7 @@ superspike_model = create_custom_weight_update_class(
     }
     """,
     derived_params=[
-        ("ExpRMS", create_dpf_class(lambda pars, dt: exp( - dt / pars[2]))())
+        ("ExpRMS", create_dpf_class(lambda pars, dt: exp(- dt / pars[2]))())
     ]
 )
 
@@ -37,7 +37,7 @@ SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "wmax": 0.1,
                      "wmin": -0.1}
 
-superspike_init = {"w": 0.0,
+superspike_init = {"w": 0.001,
                    "e": 0.0,
                    "lambda": 0.0,
                    "upsilon": 0.0,

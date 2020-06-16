@@ -53,12 +53,41 @@ target_spike_times = np.linspace(0, 500, num=7)[1:6].astype(int)
 target_spike_train = np.zeros(int(PRESENT_TIMESTEPS))
 target_spike_train[target_spike_times] = 1
 
+########### Custom spike source array neuron model ############
+
+ssa_input_model = genn_model.create_custom_neuron_class(
+    "ssa_input_model",
+    param_names=["t_rise", "t_decay"],
+    var_name_types=[("startSpike", "unsigned int"), ("endSpike", "unsigned int"),
+                    ("z", "scalar"), ("z_tilda", "scalar")],
+    sim_code="""
+    // filtered presynaptic trace
+    $(z) *= exp(- DT / $(t_rise));
+    $(z_tilda) += ((- $(z_tilda) + $(z)) / $(t_decay)) * DT;
+    """,
+    reset_code="""
+    $(startSpike)++;
+    $(z) += 1.0;
+    """,
+    threshold_condition_code="$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",
+    extra_global_params=[("spikeTimes", "scalar*")],
+    is_auto_refractory_required=False
+)
+
+SSA_INPUT_PARAMS = {"t_rise": 5, "t_decay": 10}
+
+ssa_input_init = {"startSpike": start_spike,
+                  "endSpike": end_spike,
+                  "z": 0.0,
+                  "z_tilda": 0.0}
+
 ########### Build model ################
 model = genn_model.GeNNModel("float", "spike_source_array")
 model.dT = dt
 
-inp = model.add_neuron_population("inp", 100, "SpikeSourceArray", {},
-                                  {"startSpike": start_spike, "endSpike": end_spike})
+# inp = model.add_neuron_population("inp", 100, "SpikeSourceArray", {},
+#                                   {"startSpike": start_spike, "endSpike": end_spike})
+inp = model.add_neuron_population("inp", 100, ssa_input_model, SSA_INPUT_PARAMS, ssa_input_init)
 spikeTimes = np.hstack(poisson_spikes)
 inp.set_extra_global_param("spikeTimes", spikeTimes)
 # spikeTimes needs to be set to one big vector that corresponds to all spike times of all neurons concatenated together
@@ -78,8 +107,8 @@ model.load()
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
-err_tilda_view = out.vars["err_tilda"].view
-out_V_view = out.vars["V"].view
+# err_tilda_view = out.vars["err_tilda"].view
+# out_V_view = out.vars["V"].view
 
 while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     # Calculate the timestep within the presentation
@@ -116,10 +145,10 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     spike_times = np.hstack((spike_times, times))
 
     model.pull_var_from_device("out", "err_tilda")
-    error = np.hstack((error, err_tilda_view))
+    error = np.hstack((error, out.vars["err_tilda"].view))
 
     model.pull_var_from_device("out", "V")
-    out_V = np.hstack((out_V, out_V_view))
+    out_V = np.hstack((out_V, out.vars["V"].view))
 
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
 
@@ -133,8 +162,17 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         print("Creating raster plot")
 
         fig, axes = plt.subplots(3, sharex=True)
+        fig.tight_layout(pad=2.0)
 
-        timesteps = list(range(PRESENT_TIMESTEPS))
+        timesteps = list(range(int(PRESENT_TIMESTEPS)))
         axes[0].plot(timesteps, error)
+        axes[0].scatter(target_spike_times, [0.03]*len(target_spike_times))
+        axes[0].set_title("Error")
         axes[1].plot(timesteps, out_V)
+        axes[1].set_title("Membrane potential of output neuron")
         axes[2].scatter(spike_times, spike_ids)
+        axes[2].set_title("Input spikes")
+
+        axes[-1].set_xlabel("Time [ms]")
+
+        plt.savefig("trial" + str(trial) + ".png")

@@ -14,24 +14,30 @@ TRIALS = 1
 
 # Generate poisson spike trains
 poisson_spikes = []
-dt = 1.0
-rate = 10.0
-isi = 1000.0 / (rate * dt)
-for p in range(100):
-    time = 0.0
-    neuron_spikes = []
-    while True:
-        time += expon.rvs(1) * isi
-        if time >= 500.0:
-            break
-        else:
-            neuron_spikes.append(time)
-    poisson_spikes.append(neuron_spikes)
+interval = 500
+freq = 10
+spike_dt = 0.001
+N_INPUT = 100
+compare_num = freq * spike_dt
+for p in range(N_INPUT):
+    spike_train = np.random.random_sample(interval)
+    spike_train = (spike_train < compare_num).astype(int)
+    poisson_spikes.append(np.nonzero(spike_train)[0])
+# dt = 1.0
+# rate = 10.0
+# isi = 1000.0 / (rate * dt)
+# for p in range(100):
+#     time = 0.0
+#     neuron_spikes = []
+#     while True:
+#         time += expon.rvs(1) * isi
+#         if time >= 500.0:
+#             break
+#         else:
+#             neuron_spikes.append(time)
+#     poisson_spikes.append(neuron_spikes)
 
 # poisson_spikes is a list of 100 lists: each list is the spike times for each neuron
-
-model = genn_model.GeNNModel("float", "superspike_test")
-model.dT = dt
 
 # Count spikes each neuron should emit
 spike_counts = [len(n) for n in poisson_spikes]
@@ -83,7 +89,7 @@ ssa_input_init = {"startSpike": start_spike,
 
 ########### Build model ################
 model = genn_model.GeNNModel("float", "spike_source_array")
-model.dT = dt
+model.dT = 1.0
 
 # inp = model.add_neuron_population("inp", 100, "SpikeSourceArray", {},
 #                                   {"startSpike": start_spike, "endSpike": end_spike})
@@ -170,7 +176,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         axes[0].set_title("Error")
         axes[1].plot(timesteps, out_V)
         axes[1].set_title("Membrane potential of output neuron")
-        axes[2].scatter(spike_times, spike_ids)
+        axes[2].scatter(spike_times, spike_ids, s=20)
         axes[2].set_title("Input spikes")
 
         axes[-1].set_xlabel("Time [ms]")

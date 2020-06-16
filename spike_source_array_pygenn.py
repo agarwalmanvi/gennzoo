@@ -64,7 +64,7 @@ inp.set_extra_global_param("spikeTimes", spikeTimes)
 # spikeTimes needs to be set to one big vector that corresponds to all spike times of all neurons concatenated together
 
 out = model.add_neuron_population("out", 1, lif_model, LIF_PARAMS, lif_init)
-out.set_extra_global_params("spike_times", target_spike_train)
+out.set_extra_global_param("spike_times", target_spike_train)
 
 inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, out,

@@ -3,7 +3,7 @@ Custom LIF neuron for SuperSpike
 """
 
 from pygenn.genn_model import create_custom_neuron_class, create_dpf_class
-from numpy import exp
+from numpy import exp, log
 
 lif_model = create_custom_neuron_class(
     "lif_superspike",
@@ -63,6 +63,8 @@ LIF_PARAMS = {"C": 1.0,
               "t_decay": 10,
               "beta": 1.0}
 
+LIF_PARAMS["t_peak"] = ( (LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_PARAMS["t_decay"] - LIF_PARAMS["t_rise"]) ) * log(LIF_PARAMS["t_decay"] / LIF_PARAMS["t_rise"])
+
 lif_init = {"V": -60,
             "RefracTime": 0.0,
             "z": 0.0,
@@ -70,5 +72,3 @@ lif_init = {"V": -60,
             "sigma_prime": 0.0,
             "err": 0.0,
             "err_tilda": 0.0}
-
-# TODO Use ExpCurr for equation 3.2

@@ -7,23 +7,34 @@ superspike_model = create_custom_weight_update_class(
     synapse_dynamics_code=
     """
     $(addToInSyn, $(w));
-    // Filtered Hebbian term
+    // Filtered eligibility trace
     $(e) += $(z_tilda_pre) * $(sigma_prime_post);
     $(e) *= exp(- DT / $(t_rise));
     $(lambda) += ( (- $(lambda) + $(e)) / $(t_decay)) * DT;
     // get error from neuron model
-    const scalar g = $(lambda) * $(e_post);
+    const scalar g = $(lambda) * $(err_tilda_post);
     // calculate learning rate r
     $(upsilon) = fmax($(upsilon) * exp( - DT / $(tau_rms)) , g * g);
-    const scalar r = $(r0) / sqrt($(upsilon));
     // at each time step, calculate m
+    $(m) += g;
     if ($(t) % 500 == 0) {
+        const scalar r = $(r0) / sqrt($(upsilon));
         $(w) += r * $(m);
         $(w) = fmin($(wmax), fmax($(wmin), $(w)));
         $(m) = 0.0;
     }
-    $(m) += g;
     """
 )
 
-SUPERSPIKE_PARAMS = {}
+SUPERSPIKE_PARAMS = {"t_rise": 5,
+                     "t_decay": 10,
+                     "tau_rms": 10,
+                     "r0": 1.0,
+                     "wmax": 0.1,
+                     "wmin": -0.1}
+
+superspike_init = {"w": 0.0,
+                   "e": 0.0,
+                   "lambda": 0.0,
+                   "upsilon": 0.0,
+                   "m": 0.0}

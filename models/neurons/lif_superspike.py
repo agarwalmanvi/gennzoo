@@ -9,7 +9,7 @@ lif_model = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "t_rise", "t_decay", "beta", "t_peak"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("z", "scalar"), ("z_tilda", "scalar"),
-                    ("sigma_prime", "scalar"), ("err", "scalar"), ("err_tilda", "scalar"), ("e", "scalar")],
+                    ("sigma_prime", "scalar"), ("err", "scalar"), ("err_tilda", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) <= 0.0) {
@@ -34,7 +34,7 @@ lif_model = create_custom_neuron_class(
     // normalize to unity to give final error - take approach 1
     const scalar norm_factor = 1.0 / (- exp(- $(t_peak) / $(t_rise)) + exp(- $(t_peak) / $(t_decay)));
     // possible to make norm_factor a parameter since it's basically an expression containing only constants
-    $(e) = $(err_tilda) / norm_factor;
+    $(err_tilda) = $(err_tilda) / norm_factor;
     // should the normalized error be assigned back to err_tilda? i.e. is the normalization a part of the filter alpha?
     """,
     reset_code="""
@@ -66,6 +66,8 @@ lif_init = {"V": -60,
             "RefracTime": 0.0,
             "z": 0.0,
             "z_tilda": 0.0,
-            "sigma_prime": 0.0}
+            "sigma_prime": 0.0,
+            "err": 0.0,
+            "err_tilda": 0.0}
 
 # TODO Use ExpCurr for equation 3.2

@@ -7,7 +7,8 @@ from numpy import exp
 
 lif_model = create_custom_neuron_class(
     "lif_superspike",
-    param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "t_rise", "t_decay", "beta", "t_peak"],
+    param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
+                 "t_rise", "t_decay", "beta", "t_peak"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("z", "scalar"), ("z_tilda", "scalar"),
                     ("sigma_prime", "scalar"), ("err", "scalar"), ("err_tilda", "scalar")],
     sim_code="""
@@ -26,16 +27,14 @@ lif_model = create_custom_neuron_class(
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
     // error
-    const scalar S_pred = $(spike_times)[$(t)];
+    const scalar S_pred = $(spike_times)[(int)round($(t) / DT)];
     const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
     const scalar mismatch = S_pred - S_real;
     $(err) += ( - $(err) / $(t_rise) + mismatch ) * DT;
     $(err_tilda) = ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
     // normalize to unity to give final error - take approach 1
-    const scalar norm_factor = 1.0 / (- exp(- $(t_peak) / $(t_rise)) + exp(- $(t_peak) / $(t_decay)));
-    // possible to make norm_factor a parameter since it's basically an expression containing only constants
-    $(err_tilda) = $(err_tilda) / norm_factor;
-    // should the normalized error be assigned back to err_tilda? i.e. is the normalization a part of the filter alpha?
+    // const scalar norm_factor = 1.0 / (- exp(- $(t_peak) / $(t_rise)) + exp(- $(t_peak) / $(t_decay)));
+    $(err_tilda) = $(err_tilda) / $(norm_factor);
     """,
     reset_code="""
     $(V) = $(Vrest);
@@ -45,7 +44,9 @@ lif_model = create_custom_neuron_class(
     threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
     derived_params=[
         ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
-        ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])())
+        ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])()),
+        ("norm_factor", create_dpf_class(lambda pars, dt:
+                                         1.0 / (- exp(- pars[9] / pars[6]) + exp(- pars[9] / pars[7])))())
     ],
     extra_global_params=[("spike_times", "scalar*")]
 )

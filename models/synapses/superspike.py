@@ -1,4 +1,5 @@
-from pygenn.genn_model import create_custom_weight_update_class
+from pygenn.genn_model import create_custom_weight_update_class, create_dpf_class
+from numpy import exp
 
 superspike_model = create_custom_weight_update_class(
     "superspike_model",
@@ -11,10 +12,10 @@ superspike_model = create_custom_weight_update_class(
     $(e) += $(z_tilda_pre) * $(sigma_prime_post);
     $(e) *= exp(- DT / $(t_rise));
     $(lambda) += ( (- $(lambda) + $(e)) / $(t_decay)) * DT;
-    // get error from neuron model
+    // get error from neuron model and compute full expression under integral
     const scalar g = $(lambda) * $(err_tilda_post);
     // calculate learning rate r
-    $(upsilon) = fmax($(upsilon) * exp( - DT / $(tau_rms)) , g * g);
+    $(upsilon) = fmax($(upsilon) * $(ExpRMS) , g * g);
     // at each time step, calculate m
     $(m) += g;
     if ($(t) % 500 == 0) {
@@ -23,7 +24,10 @@ superspike_model = create_custom_weight_update_class(
         $(w) = fmin($(wmax), fmax($(wmin), $(w)));
         $(m) = 0.0;
     }
-    """
+    """,
+    derived_params=[
+        ("ExpRMS", create_dpf_class(lambda pars, dt: exp( - DT / pars[2]))())
+    ]
 )
 
 SUPERSPIKE_PARAMS = {"t_rise": 5,

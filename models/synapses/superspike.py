@@ -1,4 +1,4 @@
-from pygenn.genn_model import create_custom_weight_update_class, create_dpf_class
+from pygenn.genn_model import create_custom_weight_update_class, create_dpf_class, init_var
 from numpy import exp
 
 superspike_model = create_custom_weight_update_class(
@@ -37,7 +37,7 @@ SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "wmax": 0.1,
                      "wmin": -0.1}
 
-superspike_init = {"w": 0.0005,
+superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                    "e": 0.0,
                    "lambda": 0.0,
                    "upsilon": 0.0,

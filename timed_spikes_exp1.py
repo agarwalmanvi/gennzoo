@@ -9,14 +9,15 @@ from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, supe
 import os
 
 PRESENT_TIMESTEPS = 500.0
-TRIALS = 1200
+# TRIALS = 1200
+TRIALS = 50
 
 ######### Set up spike source array type neuron for input population ############
 
 # Generate poisson spike trains
 poisson_spikes = []
 interval = 500
-freq = 1
+freq = 5
 spike_dt = 0.001
 N_INPUT = 100
 compare_num = freq * spike_dt
@@ -59,6 +60,7 @@ start_spike[1:] = end_spike[0:-1]
 target_spike_times = np.linspace(0, 500, num=7)[1:6].astype(int)
 target_spike_train = np.zeros(int(PRESENT_TIMESTEPS))
 target_spike_train[target_spike_times] = 1
+target_spike_train = np.tile(target_spike_train, TRIALS)
 
 ########### Custom spike source array neuron model ############
 
@@ -112,7 +114,8 @@ model.load()
 
 ######### Simulate #############
 
-IMG_DIR = "/home/p286814/pygenn/gennzoo/imgs"
+# IMG_DIR = "/home/p286814/pygenn/gennzoo/imgs"
+IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
@@ -126,9 +129,11 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
     if timestep_in_example == 0:
 
-        print("Trial: " + str(trial))
+        if trial % 1 == 0:
 
-        if trial % 50 == 0:
+            print("Trial: " + str(trial))
+
+        if trial % 1 == 0:
 
             spike_ids = np.empty(0)
             spike_times = np.empty(0)
@@ -137,7 +142,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
             out_V = np.empty(0)
 
-            # wts_sum = np.empty(0)
+            wts_sum = np.empty(0)
 
         if trial != 0:
             # print(type(spikeTimes))
@@ -157,7 +162,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
     model.step_time()
 
-    if trial % 50 == 0:
+    if trial % 1 == 0:
 
         model.pull_current_spikes_from_device("inp")
         times = np.ones_like(inp.current_spikes) * model.t
@@ -170,9 +175,9 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         model.pull_var_from_device("out", "V")
         out_V = np.hstack((out_V, out.vars["V"].view))
 
-    # model.pull_var_from_device("inp2out", "w")
-    # weights = inp2out.get_var_values("w")
-    # wts_sum = np.append(wts_sum, np.sum(weights))
+    model.pull_var_from_device("inp2out", "w")
+    weights = inp2out.get_var_values("w")
+    wts_sum = np.append(wts_sum, np.sum(weights))
 
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
 
@@ -183,27 +188,58 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         # axis.scatter(spike_times, spike_ids, color="red")
         # plt.savefig("trial" + str(trial) + ".png")
 
-        if trial % 50 == 0:
+        if trial % 1 == 0:
+
+            error = np.nan_to_num(error)
+
+            timesteps = np.arange(int(PRESENT_TIMESTEPS))
+            timesteps += int(PRESENT_TIMESTEPS * trial)
+
+            # print(type(error))
+            # print("error")
+            # print(error)
+            # print(len(error))
+            # print("target spike times")
+            # print(target_spike_times)
+            # print(len(target_spike_times))
+            # print("out_V")
+            # print(out_V)
+            # print(len(out_V))
+            # print("spike times")
+            # print(spike_times)
+            # print(len(spike_times))
+            # print("spike ids")
+            # print(spike_ids)
+            # print(len(spike_ids))
 
             print("Creating raster plot")
 
             # fig, axes = plt.subplots(4, sharex=True)
-            fig, axes = plt.subplots(3, sharex=True)
+            fig, axes = plt.subplots(5, sharex=True)
             fig.tight_layout(pad=2.0)
 
-            timesteps = list(range(int(PRESENT_TIMESTEPS)))
-            axes[0].plot(timesteps, error)
-            axes[0].scatter(target_spike_times, [0.03]*len(target_spike_times))
-            axes[0].set_title("Error")
-            axes[1].plot(timesteps, out_V)
-            axes[1].set_title("Membrane potential of output neuron")
-            axes[2].scatter(spike_times, spike_ids, s=20)
-            axes[2].set_title("Input spikes")
-            # axes[3].plot(timesteps, wts_sum)
-            # axes[3].set_title("Sum of weights of synapses")
+
+            # print("Timesteps")
+            # print(timesteps)
+            # print(len(timesteps))
+            axes[0].scatter(target_spike_times, [1]*len(target_spike_times))
+            axes[0].set_title("Target spike train")
+            axes[1].plot(timesteps, error)
+            axes[1].set_title("Error")
+            axes[2].plot(timesteps, out_V)
+            axes[2].axhline(y=LIF_PARAMS["Vthresh"], linestyle="--", color="red")
+            axes[2].set_title("Membrane potential of output neuron")
+            axes[3].scatter(spike_times, spike_ids, s=10)
+            axes[3].set_title("Input spikes")
+            axes[4].plot(timesteps, wts_sum)
+            axes[4].set_title("Sum of weights of synapses")
 
             axes[-1].set_xlabel("Time [ms]")
 
             save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
 
             plt.savefig(save_filename)
+
+            plt.close()
+
+        target_spike_times += int(PRESENT_TIMESTEPS)

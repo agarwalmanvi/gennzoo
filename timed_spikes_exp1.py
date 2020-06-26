@@ -71,7 +71,8 @@ ssa_input_model = genn_model.create_custom_neuron_class(
                     ("z", "scalar"), ("z_tilda", "scalar")],
     sim_code="""
     // filtered presynaptic trace
-    $(z) *= exp(- DT / $(t_rise));
+    // $(z) *= exp(- DT / $(t_rise));
+    $(z) += (- $(z) / $(t_rise)) * DT;
     $(z_tilda) += ((- $(z_tilda) + $(z)) / $(t_decay)) * DT;
     """,
     reset_code="""

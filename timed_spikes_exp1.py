@@ -10,7 +10,7 @@ import os
 
 PRESENT_TIMESTEPS = 500.0
 # TRIALS = 1200
-TRIALS = 50
+TRIALS = 5
 
 ######### Set up spike source array type neuron for input population ############
 
@@ -74,6 +74,9 @@ ssa_input_model = genn_model.create_custom_neuron_class(
     // $(z) *= exp(- DT / $(t_rise));
     $(z) += (- $(z) / $(t_rise)) * DT;
     $(z_tilda) += ((- $(z_tilda) + $(z)) / $(t_decay)) * DT;
+    if ($(z_tilda) < 0.0000001) {
+        $(z_tilda) = 0.0;
+    }
     """,
     reset_code="""
     $(startSpike)++;
@@ -105,10 +108,15 @@ inp.set_extra_global_param("spikeTimes", spikeTimes)
 out = model.add_neuron_population("out", 1, lif_model, LIF_PARAMS, lif_init)
 out.set_extra_global_param("spike_times", target_spike_train)
 
+# inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+#                                        inp, out,
+#                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
+#                                        "ExpCurr", {"tau": 5.0}, {})
+
 inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, out,
-                                       superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
-                                       "ExpCurr", {"tau": 5.0}, {})
+                                       "StaticPulse", {}, {"g": 1.0}, {}, {},
+                                       "DeltaCurr", {}, {})
 
 model.build()
 model.load()
@@ -143,7 +151,9 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
             out_V = np.empty(0)
 
-            wts_sum = np.empty(0)
+            wts = np.array([np.empty(0) for _ in range(N_INPUT)])
+
+            # wts_sum = np.empty(0)
 
         if trial != 0:
             # print(type(spikeTimes))
@@ -176,11 +186,12 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         model.pull_var_from_device("out", "V")
         out_V = np.hstack((out_V, out.vars["V"].view))
 
-    model.pull_var_from_device("inp2out", "w")
-    weights = inp2out.get_var_values("w")
-    wts_sum = np.append(wts_sum, np.sum(weights))
-
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
+
+        model.pull_var_from_device("inp2out", "w")
+        weights = inp2out.get_var_values("w")
+        weights = np.reshape(weights, (weights.shape[0], 1))
+        wts = np.concatenate((wts, weights), axis=1)
 
         # print(spike_times)
         # print(spike_ids)
@@ -191,7 +202,9 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
         if trial % 1 == 0:
 
-            error = np.nan_to_num(error)
+            print(error)
+
+            # error = np.nan_to_num(error)
 
             timesteps = np.arange(int(PRESENT_TIMESTEPS))
             timesteps += int(PRESENT_TIMESTEPS * trial)
@@ -216,7 +229,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             print("Creating raster plot")
 
             # fig, axes = plt.subplots(4, sharex=True)
-            fig, axes = plt.subplots(5, sharex=True)
+            fig, axes = plt.subplots(4, sharex=True)
             fig.tight_layout(pad=2.0)
 
 
@@ -232,8 +245,8 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             axes[2].set_title("Membrane potential of output neuron")
             axes[3].scatter(spike_times, spike_ids, s=10)
             axes[3].set_title("Input spikes")
-            axes[4].plot(timesteps, wts_sum)
-            axes[4].set_title("Sum of weights of synapses")
+            # axes[4].plot(timesteps, wts_sum)
+            # axes[4].set_title("Sum of weights of synapses")
 
             axes[-1].set_xlabel("Time [ms]")
 
@@ -244,3 +257,15 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             plt.close()
 
         target_spike_times += int(PRESENT_TIMESTEPS)
+
+print("Creating weight plot")
+fig, ax = plt.subplots()
+wts += 0.1
+wts *= (255 * 5)
+print(np.amax(wts))
+print(np.amin(wts))
+ax.imshow(wts, cmap='gray', vmin=0, vmax=255)
+ax.set_ylabel("Weights")
+ax.set_xlabel("Trials")
+plt.savefig("wts.png")
+plt.close()

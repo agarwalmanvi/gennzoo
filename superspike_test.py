@@ -16,7 +16,8 @@ TRIALS = 2
 # Generate poisson spike trains
 poisson_spikes = []
 interval = int(PRESENT_TIMESTEPS)
-freq = 8
+# freq = 8
+freq = 3
 spike_dt = 0.001
 N_INPUT = 100
 compare_num = freq * spike_dt
@@ -33,10 +34,10 @@ start_spike[1:] = end_spike[0:-1]
 
 ########### Produce target spike train ##########
 
-# target_spike_times = np.linspace(0, int(PRESENT_TIMESTEPS), num=4)[1:3].astype(int)
-# target_spike_train = np.zeros(int(PRESENT_TIMESTEPS))
-# target_spike_train[target_spike_times] = 1
-# target_spike_train = np.tile(target_spike_train, TRIALS)
+target_spike_times = np.linspace(0, int(PRESENT_TIMESTEPS), num=4)[1:3].astype(int)
+target_spike_train = np.zeros(int(PRESENT_TIMESTEPS))
+target_spike_train[target_spike_times] = 1
+target_spike_train = np.tile(target_spike_train, TRIALS)
 
 ########### Custom spike source array neuron model ############
 
@@ -73,8 +74,9 @@ ssa_input_init = {"startSpike": start_spike,
 lif_model = genn_model.create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
-                 "t_rise", "t_decay", "beta"],
-    var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar")],
+                 "t_rise", "t_decay", "beta", "t_syn"],
+    var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
+                    ("err", "scalar"), ("err_tilda", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) <= 0.0 && $(V) >= $(Vthresh)) {
@@ -91,15 +93,35 @@ lif_model = genn_model.create_custom_neuron_class(
     // filtered partial derivative
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
+    // error
+    const scalar S_pred = $(spike_times)[(int)round($(t) / DT)];
+    const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
+    const scalar mismatch = S_pred - S_real;
+    $(err) += ( (- $(err) / $(t_rise)) + mismatch ) * DT;
+    $(err_tilda) += ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
+    $(err_tilda) = $(err_tilda) / $(norm_factor);
+    if ($(err_tilda) < 0.0000001) {
+        $(err_tilda) = 0.0;
+    }
     """,
     reset_code="""
     """,
     threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
     derived_params=[
         ("ExpTC", genn_model.create_dpf_class(lambda pars, dt: np.exp(-dt / pars[1]))()),
-        ("Rmembrane", genn_model.create_dpf_class(lambda pars, dt: pars[1] / pars[0])())
+        ("Rmembrane", genn_model.create_dpf_class(lambda pars, dt: pars[1] / pars[0])()),
+        ("norm_factor", genn_model.create_dpf_class(lambda pars, dt:
+                                                    1.0 / (- np.exp(- pars[9] / pars[6]) + np.exp(
+                                                        - pars[9] / pars[7])))())
     ],
+    extra_global_params=[("spike_times", "scalar*")]
 )
+
+# ("norm_factor", genn_model.create_dpf_class(lambda pars, dt:
+#                                                     1.0 / (np.square((pars[1] * pars[-1]) / (pars[1] - pars[-1])) *
+#                                                            (pars[1] / 2 + pars[-1] / 2 -
+#                                                             2 * (pars[1] * pars[-1]) / (pars[1] + pars[-1])))
+#                                                     )())
 
 LIF_PARAMS = {"C": 1.0,
               "Tau_mem": 10.0,
@@ -109,11 +131,20 @@ LIF_PARAMS = {"C": 1.0,
               "TauRefrac": 5.0,
               "t_rise": 5.0,
               "t_decay": 10.0,
-              "beta": 1.0}
+              "beta": 1.0,
+              "t_syn": 5.0}
+
+# LIF_PARAMS["t_peak"] = ((LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_PARAMS["t_decay"] - LIF_PARAMS["t_rise"]) ) * np.log(LIF_PARAMS["t_decay"] / LIF_PARAMS["t_rise"])
 
 lif_init = {"V": -60,
             "RefracTime": 0.0,
-            "sigma_prime": 0.0}
+            "sigma_prime": 0.0,
+            "err": 0.0,
+            "err_tilda": 0.0}
+
+########## Synapse ################
+
+
 
 ########### Build model ################
 model = genn_model.GeNNModel("float", "spike_source_array")
@@ -127,7 +158,7 @@ inp.set_extra_global_param("spikeTimes", spikeTimes)
 # spikeTimes needs to be set to one big vector that corresponds to all spike times of all neurons concatenated together
 
 out = model.add_neuron_population("out", 1, lif_model, LIF_PARAMS, lif_init)
-# out.set_extra_global_param("spike_times", target_spike_train)
+out.set_extra_global_param("spike_times", target_spike_train)
 #
 # inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
 #                                        inp, out,
@@ -136,7 +167,7 @@ out = model.add_neuron_population("out", 1, lif_model, LIF_PARAMS, lif_init)
 
 inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, out,
-                                       "StaticPulse", {}, {"g": 1.0}, {}, {},
+                                       "StaticPulse", {}, {"g": 0.1}, {}, {},
                                        "DeltaCurr", {}, {})
 
 model.build()
@@ -150,6 +181,7 @@ IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
 out_voltage = out.vars['V'].view
+wts = np.array([np.empty(0) for _ in range(N_INPUT)])
 
 while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     # Calculate the timestep within the presentation
@@ -166,10 +198,10 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         # z_tilda = np.array([np.empty(0) for _ in range(N_INPUT)])
         # z_tilda = np.reshape(z_tilda, (z_tilda.shape[1], z_tilda.shape[0]))
 
-        # error = np.empty(0)
+        error = np.empty(0)
         #
         out_V = np.empty(0)
-        sigma_prime = np.empty(0)
+        # sigma_prime = np.empty(0)
         output_spikes = np.empty(0)
         #
         # wts_sum = np.empty(0)
@@ -178,7 +210,6 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         model.push_var_to_device('out', "V")
 
         if trial != 0:
-
             spikeTimes += PRESENT_TIMESTEPS
 
             spikeTimes_view[:] = spikeTimes
@@ -201,15 +232,15 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     # new_z_tilda = np.reshape(new_z_tilda, (1, new_z_tilda.shape[0]))
     # z_tilda = np.concatenate((z_tilda, new_z_tilda))
 
-    # model.pull_var_from_device("out", "err_tilda")
-    # error = np.hstack((error, out.vars["err_tilda"].view))
+    model.pull_var_from_device("out", "err_tilda")
+    error = np.hstack((error, out.vars["err_tilda"].view))
 
     model.pull_var_from_device("out", "V")
     out_V = np.hstack((out_V, out.vars["V"].view))
-
-    model.pull_var_from_device("out", "sigma_prime")
-    sigma_prime = np.hstack((sigma_prime, out.vars["sigma_prime"].view))
-
+    #
+    # model.pull_var_from_device("out", "sigma_prime")
+    # sigma_prime = np.hstack((sigma_prime, out.vars["sigma_prime"].view))
+    #
     model.pull_current_spikes_from_device("out")
     out_times = np.ones_like(out.current_spikes) * model.t
     output_spikes = np.hstack((output_spikes, out_times))
@@ -220,7 +251,20 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
 
+        # print(error)
+
         # error = np.nan_to_num(error)
+
+        print("wts shape before: ")
+        print(wts.shape)
+        model.pull_var_from_device("inp2out", "g")
+        weights = inp2out.get_var_values("g")
+        weights = np.reshape(weights, (weights.shape[0], 1))
+        print("weights shape")
+        print(weights.shape)
+        wts = np.concatenate((wts, weights), axis=1)
+        print("wts shape after: ")
+        print(wts.shape)
 
         timesteps = np.arange(int(PRESENT_TIMESTEPS))
         timesteps += int(PRESENT_TIMESTEPS * trial)
@@ -243,11 +287,11 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         # axes[2].plot(timesteps, z_tilda_1)
         # axes[2].set_title("z_tilda for input neuron 1")
 
-        axes[1].plot(timesteps, sigma_prime)
-        axes[1].set_title("Sigma prime for output neuron")
+        # axes[1].plot(timesteps, sigma_prime)
+        # axes[1].set_title("Sigma prime for output neuron")
 
-        # axes[1].plot(timesteps, error)
-        # axes[1].set_title("Error")
+        axes[1].plot(timesteps, error)
+        axes[1].set_title("Error")
         axes[2].plot(timesteps, out_V)
         axes[2].axhline(y=LIF_PARAMS["Vthresh"], linestyle="--", color="red")
         axes[2].set_title("Membrane potential of output neuron")
@@ -269,4 +313,23 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         # target_spike_times += int(PRESENT_TIMESTEPS)
 
 
-
+print("Creating weight plot")
+fig, ax = plt.subplots(figsize=(10, 50))
+# print(wts)
+wts += 0.1
+# print(wts)
+wts *= 5
+# print(wts)
+wts = np.around(wts)
+# print(wts)
+wts *= 255
+# print(wts)
+print(np.amax(wts))
+print(np.amin(wts))
+ax.imshow(wts, cmap='gray', vmin=0, vmax=255)
+for i in range(wts.shape[0]):
+    ax.axhline(y = i, color="red")
+ax.set_ylabel("Weights")
+ax.set_xlabel("Trials")
+plt.savefig("wts.png")
+plt.close()

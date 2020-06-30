@@ -34,9 +34,6 @@ lif_model = create_custom_neuron_class(
     $(err) += ( (- $(err) / $(t_rise)) + mismatch ) * DT;
     $(err_tilda) += ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
     $(err_tilda) = $(err_tilda) / $(norm_factor);
-    if ($(err_tilda) < 0.0000001) {
-        $(err_tilda) = 0.0;
-    }
     """,
     reset_code="""
     """,
@@ -67,8 +64,6 @@ LIF_PARAMS["t_peak"] = ( (LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_P
 
 lif_init = {"V": -60,
             "RefracTime": 0.0,
-            "z": 0.0,
-            "z_tilda": 0.0,
             "sigma_prime": 0.0,
             "err": 0.0,
             "err_tilda": 0.0}

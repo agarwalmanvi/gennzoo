@@ -108,15 +108,15 @@ inp.set_extra_global_param("spikeTimes", spikeTimes)
 out = model.add_neuron_population("out", 1, lif_model, LIF_PARAMS, lif_init)
 out.set_extra_global_param("spike_times", target_spike_train)
 
-# inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
-#                                        inp, out,
-#                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
-#                                        "ExpCurr", {"tau": 5.0}, {})
-
 inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, out,
-                                       "StaticPulse", {}, {"g": 1.0}, {}, {},
-                                       "DeltaCurr", {}, {})
+                                       superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
+                                       "ExpCurr", {"tau": 5.0}, {})
+
+# inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+#                                        inp, out,
+#                                        "StaticPulse", {}, {"g": 1.0}, {}, {},
+#                                        "DeltaCurr", {}, {})
 
 model.build()
 model.load()
@@ -130,6 +130,8 @@ spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
 # err_tilda_view = out.vars["err_tilda"].view
 # out_V_view = out.vars["V"].view
+wts = np.array([np.empty(0) for _ in range(N_INPUT)])
+out_voltage = out.vars['V'].view
 
 while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     # Calculate the timestep within the presentation
@@ -137,6 +139,9 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     trial = int(model.timestep // PRESENT_TIMESTEPS)
 
     if timestep_in_example == 0:
+
+        out_voltage[:] = LIF_PARAMS["Vrest"]
+        model.push_var_to_device('out', "V")
 
         if trial % 1 == 0:
 
@@ -150,8 +155,6 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             error = np.empty(0)
 
             out_V = np.empty(0)
-
-            wts = np.array([np.empty(0) for _ in range(N_INPUT)])
 
             # wts_sum = np.empty(0)
 
@@ -201,9 +204,6 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         # plt.savefig("trial" + str(trial) + ".png")
 
         if trial % 1 == 0:
-
-            print(error)
-
             # error = np.nan_to_num(error)
 
             timesteps = np.arange(int(PRESENT_TIMESTEPS))
@@ -259,13 +259,28 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         target_spike_times += int(PRESENT_TIMESTEPS)
 
 print("Creating weight plot")
-fig, ax = plt.subplots()
-wts += 0.1
-wts *= (255 * 5)
+fig, ax = plt.subplots(figsize=(10, 50))
+# print(wts)
+# wts += 0.1
+# print(wts)
+# wts *= 5
+# print(wts)
+# wts = np.around(wts)
+# print(wts)
+# wts *= 255
+# print(wts)
+# wts = np.where(wts < 0.0, wts, 0.0)
 print(np.amax(wts))
 print(np.amin(wts))
-ax.imshow(wts, cmap='gray', vmin=0, vmax=255)
+ax.imshow(wts, cmap='gray', vmin=-0.1, vmax=0.1)
+for i in range(wts.shape[0]):
+    ax.axhline(y=i+0.5, color="red")
+for i in range(wts.shape[1]):
+    ax.axvline(x=i+0.5, color="red")
 ax.set_ylabel("Weights")
 ax.set_xlabel("Trials")
-plt.savefig("wts.png")
+plt.yticks(list(range(wts.shape[0])))
+plt.xticks(list(range(wts.shape[1])))
+save_filename = os.path.join(IMG_DIR, "wts.png")
+plt.savefig(save_filename)
 plt.close()

@@ -37,7 +37,7 @@ SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "wmax": 0.1,
                      "wmin": -0.1}
 
-superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
+superspike_init = {"w": init_var("Uniform", {"min": -0.01, "max": 0.01}),
                    "e": 0.0,
                    "lambda": 0.0,
                    "upsilon": 0.0,

@@ -17,7 +17,7 @@ TRIALS = 5
 # Generate poisson spike trains
 poisson_spikes = []
 interval = 500
-freq = 5
+freq = 8
 spike_dt = 0.001
 N_INPUT = 100
 compare_num = freq * spike_dt

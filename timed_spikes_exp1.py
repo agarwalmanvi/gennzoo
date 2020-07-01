@@ -129,9 +129,9 @@ IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
 # err_tilda_view = out.vars["err_tilda"].view
-# out_V_view = out.vars["V"].view
 wts = np.array([np.empty(0) for _ in range(N_INPUT)])
 out_voltage = out.vars['V'].view
+inp_z_tilda = inp.vars["z_tilda"].view
 
 while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
     # Calculate the timestep within the presentation
@@ -143,6 +143,9 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         out_voltage[:] = LIF_PARAMS["Vrest"]
         model.push_var_to_device('out', "V")
 
+        inp_z_tilda[:] = ssa_input_init["z_tilda"]
+        model.push_var_to_device('inp', 'z_tilda')
+
         if trial % 1 == 0:
 
             print("Trial: " + str(trial))
@@ -151,6 +154,8 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
             spike_ids = np.empty(0)
             spike_times = np.empty(0)
+
+            # mismatch = np.empty(0)
 
             error = np.empty(0)
 
@@ -189,12 +194,17 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         model.pull_var_from_device("out", "V")
         out_V = np.hstack((out_V, out.vars["V"].view))
 
+        # model.pull_var_from_device("out", "mismatch")
+        # mismatch = np.hstack((mismatch, out.vars["mismatch"].view))
+
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
 
         model.pull_var_from_device("inp2out", "w")
         weights = inp2out.get_var_values("w")
         weights = np.reshape(weights, (weights.shape[0], 1))
         wts = np.concatenate((wts, weights), axis=1)
+
+        # print(error)
 
         # print(spike_times)
         # print(spike_ids)
@@ -227,22 +237,27 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             # print(len(spike_ids))
 
             print("Creating raster plot")
+            timesteps = np.arange(int(PRESENT_TIMESTEPS))
+            timesteps += int(PRESENT_TIMESTEPS * trial)
 
-            # fig, axes = plt.subplots(4, sharex=True)
             fig, axes = plt.subplots(4, sharex=True)
+            # fig, axes = plt.subplots(3, sharex=True)
             fig.tight_layout(pad=2.0)
 
 
             # print("Timesteps")
             # print(timesteps)
             # print(len(timesteps))
-            axes[0].scatter(target_spike_times, [1]*len(target_spike_times))
+            target_spike_times_plot = target_spike_times + int(PRESENT_TIMESTEPS * trial)
+            axes[0].scatter(target_spike_times_plot, [1]*len(target_spike_times_plot))
             axes[0].set_title("Target spike train")
             axes[1].plot(timesteps, error)
             axes[1].set_title("Error")
             axes[2].plot(timesteps, out_V)
             axes[2].axhline(y=LIF_PARAMS["Vthresh"], linestyle="--", color="red")
             axes[2].set_title("Membrane potential of output neuron")
+            # axes[2].plot(timesteps, mismatch)
+            # axes[2].set_title("Mismatch")
             axes[3].scatter(spike_times, spike_ids, s=10)
             axes[3].set_title("Input spikes")
             # axes[4].plot(timesteps, wts_sum)
@@ -256,8 +271,6 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
             plt.close()
 
-        target_spike_times += int(PRESENT_TIMESTEPS)
-
 print("Creating weight plot")
 fig, ax = plt.subplots(figsize=(10, 50))
 # print(wts)
@@ -270,8 +283,8 @@ fig, ax = plt.subplots(figsize=(10, 50))
 # wts *= 255
 # print(wts)
 # wts = np.where(wts < 0.0, wts, 0.0)
-print(np.amax(wts))
-print(np.amin(wts))
+# print(np.amax(wts))
+# print(np.amin(wts))
 ax.imshow(wts, cmap='gray', vmin=-0.1, vmax=0.1)
 for i in range(wts.shape[0]):
     ax.axhline(y=i+0.5, color="red")

@@ -10,7 +10,8 @@ lif_model = create_custom_neuron_class(
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
                  "t_rise", "t_decay", "beta", "t_peak"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
-                    ("err", "scalar"), ("err_tilda", "scalar")],
+                    ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
+                    ("mismatch", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) <= 0.0 && $(V) >= $(Vthresh)) {
@@ -30,10 +31,10 @@ lif_model = create_custom_neuron_class(
     // error
     const scalar S_pred = $(spike_times)[(int)round($(t) / DT)];
     const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
-    const scalar mismatch = S_pred - S_real;
-    $(err) += ( (- $(err) / $(t_rise)) + mismatch ) * DT;
-    $(err_tilda) += ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
-    $(err_tilda) = $(err_tilda) / $(norm_factor);
+    $(mismatch) = S_pred - S_real;
+    $(err_rise) = ($(err_rise) * $(t_rise_mult)) + $(mismatch);
+    $(err_decay) = ($(err_decay) * $(t_decay_mult)) + $(mismatch);
+    $(err_tilda) = ($(err_decay) - $(err_rise)) * $(norm_factor); 
     """,
     reset_code="""
     """,
@@ -42,8 +43,10 @@ lif_model = create_custom_neuron_class(
         ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
         ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])()),
         ("norm_factor", create_dpf_class(lambda pars, dt:
-                                                    1.0 / (- exp(- pars[9] / pars[6]) + exp(
-                                                        - pars[9] / pars[7])))())
+                                         1.0 / (- exp(- pars[9] / pars[6]) + exp(
+                                             - pars[9] / pars[7])))()),
+        ("t_rise_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[6]))()),
+        ("t_decay_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[7]))())
     ],
     extra_global_params=[("spike_times", "scalar*")]
 )
@@ -60,10 +63,17 @@ LIF_PARAMS = {"C": 1.0,
               "t_decay": 10.0,
               "beta": 1.0}
 
-LIF_PARAMS["t_peak"] = ( (LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_PARAMS["t_decay"] - LIF_PARAMS["t_rise"]) ) * log(LIF_PARAMS["t_decay"] / LIF_PARAMS["t_rise"])
+LIF_PARAMS["t_peak"] = ((LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_PARAMS["t_decay"] - LIF_PARAMS["t_rise"])) \
+                       * log(LIF_PARAMS["t_decay"] / LIF_PARAMS["t_rise"])
 
 lif_init = {"V": -60,
             "RefracTime": 0.0,
             "sigma_prime": 0.0,
-            "err": 0.0,
-            "err_tilda": 0.0}
+            "err_rise": 0.0,
+            "err_decay": 0.0,
+            "err_tilda": 0.0,
+            "mismatch": 0.0}
+
+# $(err) += ( ( - $(err) / $(t_rise) ) + $(mismatch) ) * DT;
+# $(err_tilda) += ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
+# $(err_tilda) = $(err_tilda) * $(norm_factor);

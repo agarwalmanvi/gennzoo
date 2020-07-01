@@ -16,7 +16,6 @@ lif_model = create_custom_neuron_class(
     // membrane potential dynamics
     if ($(RefracTime) <= 0.0 && $(V) >= $(Vthresh)) {
         $(V) = $(Vrest);
-        $(RefracTime) = $(TauRefrac);
     }
     if ($(RefracTime) <= 0.0) {
         scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
@@ -34,9 +33,10 @@ lif_model = create_custom_neuron_class(
     $(mismatch) = S_pred - S_real;
     $(err_rise) = ($(err_rise) * $(t_rise_mult)) + $(mismatch);
     $(err_decay) = ($(err_decay) * $(t_decay_mult)) + $(mismatch);
-    $(err_tilda) = ($(err_decay) - $(err_rise)) * $(norm_factor); 
+    $(err_tilda) = ($(err_decay) - $(err_rise)) * $(norm_factor);
     """,
     reset_code="""
+    $(RefracTime) = $(TauRefrac);
     """,
     threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
     derived_params=[
@@ -53,7 +53,7 @@ lif_model = create_custom_neuron_class(
 
 ## spike_times should be a binary array that captures the target binary spike train
 
-LIF_PARAMS = {"C": 1.0,
+LIF_PARAMS = {"C": 10.0,
               "Tau_mem": 10.0,
               "Vrest": -60.0,
               "Vthresh": -50.0,

@@ -4,10 +4,13 @@ from numpy import exp
 superspike_model = create_custom_weight_update_class(
     "superspike_model",
     param_names=["t_rise", "t_decay", "tau_rms", "r0", "wmax", "wmin"],
-    var_name_types=[("w", "scalar"), ("e", "scalar"), ("lambda", "scalar"), ("upsilon", "scalar"), ("m", "scalar")],
+    var_name_types=[("w", "scalar"), ("e", "scalar"), ("lambda", "scalar"), ("upsilon", "scalar"),
+                    ("m", "scalar")],
+    sim_code="""
+    $(addToInSyn, $(w));
+    """,
     synapse_dynamics_code=
     """
-    $(addToInSyn, $(w));
     // Filtered eligibility trace
     $(e) += $(z_tilda_pre) * $(sigma_prime_post);
     $(e) *= exp(- DT / $(t_rise));

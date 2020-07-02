@@ -10,7 +10,7 @@ import os
 
 PRESENT_TIMESTEPS = 500.0
 # TRIALS = 1200
-TRIALS = 5
+TRIALS = 30
 
 ######### Set up spike source array type neuron for input population ############
 
@@ -124,7 +124,7 @@ model.load()
 ######### Simulate #############
 
 # IMG_DIR = "/home/p286814/pygenn/gennzoo/imgs"
-IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
+IMG_DIR = "imgs"
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
@@ -254,7 +254,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             axes[1].plot(timesteps, error)
             axes[1].set_title("Error")
             axes[2].plot(timesteps, out_V)
-            axes[2].axhline(y=LIF_PARAMS["Vthresh"], linestyle="--", color="red")
+            # axes[2].axhline(y=LIF_PARAMS["Vthresh"], linestyle="--", color="red")
             axes[2].set_title("Membrane potential of output neuron")
             # axes[2].plot(timesteps, mismatch)
             # axes[2].set_title("Mismatch")
@@ -272,6 +272,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             plt.close()
 
 print("Creating weight plot")
+# print(wts)
 fig, ax = plt.subplots(figsize=(10, 50))
 # print(wts)
 # wts += 0.1
@@ -285,13 +286,15 @@ fig, ax = plt.subplots(figsize=(10, 50))
 # wts = np.where(wts < 0.0, wts, 0.0)
 # print(np.amax(wts))
 # print(np.amin(wts))
-ax.imshow(wts, cmap='gray', vmin=-0.1, vmax=0.1)
-for i in range(wts.shape[0]):
-    ax.axhline(y=i+0.5, color="red")
-for i in range(wts.shape[1]):
-    ax.axvline(x=i+0.5, color="red")
-ax.set_ylabel("Weights")
-ax.set_xlabel("Trials")
+plt.figure()
+plt.imshow(wts, cmap='gray')
+plt.colorbar()
+# for i in range(wts.shape[0]):
+#     ax.axhline(y=i+0.5, color="red")
+# for i in range(wts.shape[1]):
+#     ax.axvline(x=i+0.5, color="red")
+# ax.set_ylabel("Weights")
+# ax.set_xlabel("Trials")
 plt.yticks(list(range(wts.shape[0])))
 plt.xticks(list(range(wts.shape[1])))
 save_filename = os.path.join(IMG_DIR, "wts.png")

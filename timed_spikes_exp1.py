@@ -10,7 +10,7 @@ import os
 
 PRESENT_TIMESTEPS = 500.0
 # TRIALS = 1200
-TRIALS = 5
+TRIALS = 10
 
 ######### Set up spike source array type neuron for input population ############
 
@@ -285,7 +285,7 @@ fig, ax = plt.subplots(figsize=(10, 50))
 # wts = np.where(wts < 0.0, wts, 0.0)
 # print(np.amax(wts))
 # print(np.amin(wts))
-ax.imshow(wts, cmap='gray', vmin=-0.1, vmax=0.1)
+ax.imshow(wts, cmap='gray', vmin=SUPERSPIKE_PARAMS["wmin"], vmax=SUPERSPIKE_PARAMS["wmax"])
 for i in range(wts.shape[0]):
     ax.axhline(y=i+0.5, color="red")
 for i in range(wts.shape[1]):

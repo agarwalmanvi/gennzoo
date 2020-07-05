@@ -123,7 +123,7 @@ model.load()
 
 ######### Simulate #############
 
-IMG_DIR = "/home/manvi/gennzoo/imgs"
+IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
 # IMG_DIR = "imgs"
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view

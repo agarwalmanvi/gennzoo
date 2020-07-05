@@ -14,7 +14,7 @@ lif_model = create_custom_neuron_class(
                     ("mismatch", "scalar")],
     sim_code="""
     // membrane potential dynamics
-    if ($(RefracTime) <= 0.0 && $(V) >= $(Vthresh)) {
+    if ($(RefracTime) == $(TauRefrac)) {
         $(V) = $(Vrest);
     }
     if ($(RefracTime) <= 0.0) {

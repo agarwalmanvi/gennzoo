@@ -12,13 +12,12 @@ superspike_model = create_custom_weight_update_class(
     synapse_dynamics_code=
     """
     // Filtered eligibility trace
-    $(e) += $(z_tilda_pre) * $(sigma_prime_post);
-    $(e) *= exp(- DT / $(t_rise));
-    $(lambda) += ( (- $(lambda) + $(e)) / $(t_decay)) * DT;
+    $(e) += ($(z_tilda_pre) * $(sigma_prime_post) - $(e)/$(t_rise))*DT;
+    $(lambda) += ((- $(lambda) + $(e)) / $(t_decay)) * DT;
     // get error from neuron model and compute full expression under integral
     const scalar g = $(lambda) * $(err_tilda_post);
     // calculate learning rate r
-    $(upsilon) = fmax($(upsilon) * $(ExpRMS) , g * g);
+    $(upsilon) = 1.0; //fmax($(upsilon) * $(ExpRMS) , g * g);
     // at each time step, calculate m
     $(m) += g;
     if ((int)round($(t)) % 500 == 0 && (int)round($(t)) != 0) {
@@ -36,9 +35,9 @@ superspike_model = create_custom_weight_update_class(
 SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "t_decay": 10,
                      "tau_rms": 10,
-                     "r0": 0.0001,
-                     "wmax": 0.1,
-                     "wmin": -0.1}
+                     "r0": 0.2,
+                     "wmax": 10,
+                     "wmin": -10}
 
 superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                    "e": 0.0,

@@ -3,7 +3,7 @@ Custom LIF neuron for SuperSpike
 """
 
 from pygenn.genn_model import create_custom_neuron_class, create_dpf_class
-from numpy import exp, log, 
+from numpy import exp, log, random
 
 # OUTPUT NEURON MODEL #
 output_model = create_custom_neuron_class(
@@ -65,7 +65,7 @@ OUTPUT_PARAMS = {"C": 10.0,
                  "beta": 1.0}
 
 OUTPUT_PARAMS["t_peak"] = ((OUTPUT_PARAMS["t_decay"] * OUTPUT_PARAMS["t_rise"]) / (
-            OUTPUT_PARAMS["t_decay"] - OUTPUT_PARAMS["t_rise"])) \
+        OUTPUT_PARAMS["t_decay"] - OUTPUT_PARAMS["t_rise"])) \
                           * log(OUTPUT_PARAMS["t_decay"] / OUTPUT_PARAMS["t_rise"])
 
 output_init = {"V": -60,
@@ -77,6 +77,9 @@ output_init = {"V": -60,
                "mismatch": 0.0}
 
 # HIDDEN NEURON MODEL #
+
+NUM_HIDDEN = 4
+
 hidden_model = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "feedback_mult"],
@@ -111,22 +114,15 @@ hidden_model = create_custom_neuron_class(
 )
 
 HIDDEN_PARAMS = {"C": 10.0,
-              "Tau_mem": 10.0,
-              "Vrest": -60.0,
-              "Vthresh": -50.0,
-              "Ioffset": 0.0,
-              "TauRefrac": 5.0,
-              "beta": 1.0,
-                 "feedback_mult": np.}
+                 "Tau_mem": 10.0,
+                 "Vrest": -60.0,
+                 "Vthresh": -50.0,
+                 "Ioffset": 0.0,
+                 "TauRefrac": 5.0,
+                 "beta": 1.0,
+                 "feedback_mult": random.normal(size=NUM_HIDDEN)}
 
-lif_init = {"V": -60,
-            "RefracTime": 0.0,
-            "sigma_prime": 0.0,
-            "err_rise": 0.0,
-            "err_decay": 0.0,
-            "err_tilda": 0.0,
-            "mismatch": 0.0}
-
-# $(err) += ( ( - $(err) / $(t_rise) ) + $(mismatch) ) * DT;
-# $(err_tilda) += ( ( - $(err_tilda) + $(err) ) / $(t_decay) ) * DT;
-# $(err_tilda) = $(err_tilda) * $(norm_factor);
+hidden_init = {"V": -60,
+               "RefracTime": 0.0,
+               "sigma_prime": 0.0,
+               "err_tilda": 0.0}

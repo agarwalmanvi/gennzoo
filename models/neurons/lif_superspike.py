@@ -2,7 +2,7 @@
 Custom LIF neuron for SuperSpike
 """
 
-from pygenn.genn_model import create_custom_neuron_class, create_dpf_class
+from pygenn.genn_model import create_custom_neuron_class, create_dpf_class, init_var
 from numpy import exp, log, random
 
 # OUTPUT NEURON MODEL #
@@ -82,8 +82,10 @@ NUM_HIDDEN = 4
 
 hidden_model = create_custom_neuron_class(
     "lif_superspike",
-    param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "feedback_mult"],
-    var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"), ("err_tilda", "scalar")],
+    param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "t_rise", "t_decay"],
+    var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
+                    ("err_tilda", "scalar"), ("feedback_mult", "scalar"), ("z", "scalar"),
+                    ("z_tilda", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -96,6 +98,12 @@ hidden_model = create_custom_neuron_class(
     else {
         $(RefracTime) -= DT;
     }
+    // filtered presynaptic trace
+    $(z) += (- $(z) / $(t_rise)) * DT;
+    $(z_tilda) += ((- $(z_tilda) + $(z)) / $(t_decay)) * DT;
+    if ($(z_tilda) < 0.0000001) {
+        $(z_tilda) = 0.0;
+    }
     // filtered partial derivative
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
@@ -104,6 +112,7 @@ hidden_model = create_custom_neuron_class(
     """,
     reset_code="""
     $(RefracTime) = $(TauRefrac);
+    $(z) += 1.0;
     """,
     threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
     derived_params=[
@@ -120,9 +129,13 @@ HIDDEN_PARAMS = {"C": 10.0,
                  "Ioffset": 0.0,
                  "TauRefrac": 5.0,
                  "beta": 1.0,
-                 "feedback_mult": random.normal(size=NUM_HIDDEN)}
+                 "t_rise": 5.0,
+                 "t_decay": 10.0}
 
 hidden_init = {"V": -60,
                "RefracTime": 0.0,
                "sigma_prime": 0.0,
-               "err_tilda": 0.0}
+               "err_tilda": 0.0,
+               "feedback_mult": init_var("Normal", {"mean": 0.0, "sd": 1.0}),
+               "z": 0.0,
+               "z_tilda": 0.0}

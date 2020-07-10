@@ -85,7 +85,7 @@ hidden_model = create_custom_neuron_class(
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "t_rise", "t_decay"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_tilda", "scalar"), ("feedback_mult", "scalar"), ("z", "scalar"),
-                    ("z_tilda", "scalar")],
+                    ("z_tilda", "scalar"), ("err_output", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -118,8 +118,7 @@ hidden_model = create_custom_neuron_class(
     derived_params=[
         ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
         ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])())
-    ],
-    extra_global_params=[("err_output", "scalar")]
+    ]
 )
 
 HIDDEN_PARAMS = {"C": 10.0,
@@ -138,4 +137,5 @@ hidden_init = {"V": -60,
                "err_tilda": 0.0,
                "feedback_mult": init_var("Normal", {"mean": 0.0, "sd": 1.0}),
                "z": 0.0,
-               "z_tilda": 0.0}
+               "z_tilda": 0.0,
+               "err_output": 0.0}

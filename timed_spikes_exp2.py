@@ -10,7 +10,8 @@ from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, supe
 import os
 
 PRESENT_TIMESTEPS = 500.0
-TRIALS = 2000
+# TRIALS = 2000
+TRIALS = 500
 
 ######### Set up spike source array type neuron for input population ############
 
@@ -91,7 +92,7 @@ inp.set_extra_global_param("spikeTimes", spikeTimes)
 # spikeTimes needs to be set to one big vector that corresponds to all spike times of all neurons concatenated together
 
 hid = model.add_neuron_population("hid", NUM_HIDDEN, hidden_model, HIDDEN_PARAMS, hidden_init)
-hid.set_extra_global_param("err_output", output_init["err_tilda"])
+# hid.set_extra_global_param("err_output", output_init["err_tilda"])
 
 out = model.add_neuron_population("out", 1, output_model, OUTPUT_PARAMS, output_init)
 out.set_extra_global_param("spike_times", target_spike_train)
@@ -115,10 +116,11 @@ IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
 # IMG_DIR = "imgs"
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
-hid_err_output_view = hid.extra_global_params['err_output'].view
+hid_err_output_view = hid.vars['err_output'].view
 start_spike_view = inp.vars['startSpike'].view
 # err_tilda_view = out.vars["err_tilda"].view
-# wts = np.array([np.empty(0) for _ in range(N_INPUT)])
+wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * NUM_HIDDEN)])
+wts_hid2out = np.array([np.empty(0) for _ in range(NUM_HIDDEN)])
 out_voltage = out.vars['V'].view
 inp_z_tilda = inp.vars["z_tilda"].view
 
@@ -172,11 +174,11 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
         # print(spikeTimes)
 
-    model.step_time()
-
     model.pull_var_from_device("out", "err_tilda")
-    hid_err_output_view = out.vars["err_tilda"].view
-    model.push_extra_global_param_to_device("hid", "err_output")
+    hid_err_output_view[:] = out.vars["err_tilda"].view[:]
+    model.push_var_to_device("hid", "err_output")
+
+    model.step_time()
 
     if trial % 1 == 0:
 
@@ -198,17 +200,22 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
         model.pull_var_from_device("hid", "V")
         new_hidden_V = hid.vars["V"].view
         for i in range(len(hidden_V)):
-            hidden_V[i] = np.hstack(hidden_V[i], new_hidden_V[i])
+            hidden_V[i] = np.hstack((hidden_V[i], new_hidden_V[i]))
 
         # model.pull_var_from_device("out", "mismatch")
         # mismatch = np.hstack((mismatch, out.vars["mismatch"].view))
 
     if timestep_in_example == (PRESENT_TIMESTEPS - 1):
 
-        # model.pull_var_from_device("inp2out", "w")
-        # weights = inp2out.get_var_values("w")
-        # weights = np.reshape(weights, (weights.shape[0], 1))
-        # wts = np.concatenate((wts, weights), axis=1)
+        model.pull_var_from_device("inp2hid", "w")
+        weights = inp2hid.get_var_values("w")
+        weights = np.reshape(weights, (weights.shape[0], 1))
+        wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
+
+        model.pull_var_from_device("hid2out", "w")
+        weights = hid2out.get_var_values("w")
+        weights = np.reshape(weights, (weights.shape[0], 1))
+        wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
 
         # print(error)
 
@@ -270,12 +277,13 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             # axes[2].plot(timesteps, mismatch)
             # axes[2].set_title("Mismatch")
 
-            for i in range(NUM_HIDDEN):
-                axes[2+int(NUM_HIDDEN)].plot(timesteps, hidden_V[i])
-                axes[2 + int(NUM_HIDDEN)].set_title("Membrane potential of hidden neuron " + str(NUM_HIDDEN))
+            for i in range(2, 6):
+                axes[i].plot(timesteps, hidden_V[i-2])
+                axes[i].set_title("Membrane potential of hidden neuron " + str(i - 2))
+                axes[i].axhline(y=HIDDEN_PARAMS["Vthresh"], linestyle="--", color="red")
 
-            axes[-1].scatter(spike_times, spike_ids, s=10)
-            axes[-1].set_title("Input spikes")
+            axes[6].scatter(spike_times, spike_ids, s=10)
+            axes[6].set_title("Input spikes")
             # axes[4].plot(timesteps, wts_sum)
             # axes[4].set_title("Sum of weights of synapses")
 
@@ -287,7 +295,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
             plt.close()
 
-print("Creating weight plot")
+print("Creating wts_inp2hid")
 # print(wts)
 # fig, ax = plt.subplots(figsize=(10, 50))
 # print(wts)
@@ -302,8 +310,8 @@ print("Creating weight plot")
 # wts = np.where(wts < 0.0, wts, 0.0)
 # print(np.amax(wts))
 # print(np.amin(wts))
-plt.figure()
-plt.imshow(wts, cmap='gray')
+plt.figure(figsize=(10, 50))
+plt.imshow(wts_inp2hid, cmap='gray')
 plt.colorbar()
 # for i in range(wts.shape[0]):
 #     ax.axhline(y=i+0.5, color="red")
@@ -311,8 +319,23 @@ plt.colorbar()
 #     ax.axvline(x=i+0.5, color="red")
 # ax.set_ylabel("Weights")
 # ax.set_xlabel("Trials")
-plt.yticks(list(range(wts.shape[0])))
-plt.xticks(list(range(wts.shape[1])))
-save_filename = os.path.join(IMG_DIR, "wts.png")
+plt.yticks(list(range(wts_inp2hid.shape[0])))
+plt.xticks(list(range(wts_inp2hid.shape[1])))
+save_filename = os.path.join(IMG_DIR, "wts_inp2hid.png")
+plt.savefig(save_filename)
+plt.close()
+print("Creating wts_hid2out")
+plt.figure()
+plt.imshow(wts_hid2out, cmap='gray')
+plt.colorbar()
+# for i in range(wts.shape[0]):
+#     ax.axhline(y=i+0.5, color="red")
+# for i in range(wts.shape[1]):
+#     ax.axvline(x=i+0.5, color="red")
+# ax.set_ylabel("Weights")
+# ax.set_xlabel("Trials")
+plt.yticks(list(range(wts_hid2out.shape[0])))
+plt.xticks(list(range(wts_hid2out.shape[1])))
+save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
 plt.savefig(save_filename)
 plt.close()

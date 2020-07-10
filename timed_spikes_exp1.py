@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 
 from pygenn import genn_wrapper
 from pygenn import genn_model
-from models.neurons.lif_superspike import lif_model, LIF_PARAMS, lif_init
+from models.neurons.lif_superspike import output_model, OUTPUT_PARAMS, output_init
 from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, superspike_init
 import os
 
 PRESENT_TIMESTEPS = 500.0
-TRIALS = 1200
-# TRIALS = 1
+TRIALS = 2000
+# TRIALS = 10
 
 ######### Set up spike source array type neuron for input population ############
 
@@ -105,7 +105,7 @@ spikeTimes = np.hstack(poisson_spikes).astype(float)
 inp.set_extra_global_param("spikeTimes", spikeTimes)
 # spikeTimes needs to be set to one big vector that corresponds to all spike times of all neurons concatenated together
 
-out = model.add_neuron_population("out", 1, lif_model, LIF_PARAMS, lif_init)
+out = model.add_neuron_population("out", 1, output_model, OUTPUT_PARAMS, output_init)
 out.set_extra_global_param("spike_times", target_spike_train)
 
 inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
@@ -140,7 +140,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
 
     if timestep_in_example == 0:
 
-        out_voltage[:] = LIF_PARAMS["Vrest"]
+        out_voltage[:] = OUTPUT_PARAMS["Vrest"]
         model.push_var_to_device('out', "V")
 
         inp_z_tilda[:] = ssa_input_init["z_tilda"]
@@ -261,7 +261,7 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             axes[1].plot(timesteps, error)
             axes[1].set_title("Error")
             axes[2].plot(timesteps, out_V)
-            axes[2].axhline(y=LIF_PARAMS["Vthresh"], linestyle="--", color="red")
+            axes[2].axhline(y=OUTPUT_PARAMS["Vthresh"], linestyle="--", color="red")
             axes[2].set_title("Membrane potential of output neuron")
             for i in produced_spike_train:
                 axes[2].axvline(x=i, linestyle="--", color="red")

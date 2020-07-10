@@ -16,11 +16,11 @@ superspike_model = create_custom_weight_update_class(
     $(lambda) += ((- $(lambda) + $(e)) / $(t_decay)) * DT;
     // get error from neuron model and compute full expression under integral
     const scalar g = $(lambda) * $(err_tilda_post);
-    // calculate learning rate r
-    $(upsilon) = 1.0; //fmax($(upsilon) * $(ExpRMS) , g * g);
     // at each time step, calculate m
     $(m) += g;
     if ((int)round($(t)) % 500 == 0 && (int)round($(t)) != 0) {
+        // calculate learning rate r
+        $(upsilon) = fmax($(upsilon) * $(ExpRMS) , (($(m) * $(m)) / 500.0));
         const scalar r = $(r0) / sqrt($(upsilon));
         $(w) += r * $(m);
         $(w) = fmin($(wmax), fmax($(wmin), $(w)));
@@ -28,14 +28,14 @@ superspike_model = create_custom_weight_update_class(
     }
     """,
     derived_params=[
-        ("ExpRMS", create_dpf_class(lambda pars, dt: exp(- dt / pars[2]))())
+        ("ExpRMS", create_dpf_class(lambda pars, dt: exp(- 500.0 / pars[2]))())
     ]
 )
 
 SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "t_decay": 10,
-                     "tau_rms": 10,
-                     "r0": 0.2,
+                     "tau_rms": 30,
+                     "r0": 0.001,
                      "wmax": 10,
                      "wmin": -10}
 

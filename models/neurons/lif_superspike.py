@@ -3,9 +3,10 @@ Custom LIF neuron for SuperSpike
 """
 
 from pygenn.genn_model import create_custom_neuron_class, create_dpf_class
-from numpy import exp, log
+from numpy import exp, log, 
 
-lif_model = create_custom_neuron_class(
+# OUTPUT NEURON MODEL #
+output_model = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
                  "t_rise", "t_decay", "beta", "t_peak"],
@@ -53,18 +54,70 @@ lif_model = create_custom_neuron_class(
 
 ## spike_times should be a binary array that captures the target binary spike train
 
-LIF_PARAMS = {"C": 10.0,
+OUTPUT_PARAMS = {"C": 10.0,
+                 "Tau_mem": 10.0,
+                 "Vrest": -60.0,
+                 "Vthresh": -50.0,
+                 "Ioffset": 0.0,
+                 "TauRefrac": 5.0,
+                 "t_rise": 5.0,
+                 "t_decay": 10.0,
+                 "beta": 1.0}
+
+OUTPUT_PARAMS["t_peak"] = ((OUTPUT_PARAMS["t_decay"] * OUTPUT_PARAMS["t_rise"]) / (
+            OUTPUT_PARAMS["t_decay"] - OUTPUT_PARAMS["t_rise"])) \
+                          * log(OUTPUT_PARAMS["t_decay"] / OUTPUT_PARAMS["t_rise"])
+
+output_init = {"V": -60,
+               "RefracTime": 0.0,
+               "sigma_prime": 0.0,
+               "err_rise": 0.0,
+               "err_decay": 0.0,
+               "err_tilda": 0.0,
+               "mismatch": 0.0}
+
+# HIDDEN NEURON MODEL #
+hidden_model = create_custom_neuron_class(
+    "lif_superspike",
+    param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "feedback_mult"],
+    var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"), ("err_tilda", "scalar")],
+    sim_code="""
+    // membrane potential dynamics
+    if ($(RefracTime) == $(TauRefrac)) {
+        $(V) = $(Vrest);
+    }
+    if ($(RefracTime) <= 0.0) {
+        scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
+        $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+    }
+    else {
+        $(RefracTime) -= DT;
+    }
+    // filtered partial derivative
+    const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
+    $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
+    // error
+    $(err_tilda) = $(err_output) * $(feedback_mult);
+    """,
+    reset_code="""
+    $(RefracTime) = $(TauRefrac);
+    """,
+    threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
+    derived_params=[
+        ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
+        ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])())
+    ],
+    extra_global_params=[("err_output", "scalar")]
+)
+
+HIDDEN_PARAMS = {"C": 10.0,
               "Tau_mem": 10.0,
               "Vrest": -60.0,
               "Vthresh": -50.0,
               "Ioffset": 0.0,
               "TauRefrac": 5.0,
-              "t_rise": 5.0,
-              "t_decay": 10.0,
-              "beta": 1.0}
-
-LIF_PARAMS["t_peak"] = ((LIF_PARAMS["t_decay"] * LIF_PARAMS["t_rise"]) / (LIF_PARAMS["t_decay"] - LIF_PARAMS["t_rise"])) \
-                       * log(LIF_PARAMS["t_decay"] / LIF_PARAMS["t_rise"])
+              "beta": 1.0,
+                 "feedback_mult": np.}
 
 lif_init = {"V": -60,
             "RefracTime": 0.0,

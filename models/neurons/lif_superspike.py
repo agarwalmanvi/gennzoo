@@ -5,7 +5,7 @@ Custom LIF neuron for SuperSpike
 from pygenn.genn_model import create_custom_neuron_class, create_dpf_class, init_var
 from numpy import exp, log, random
 
-# OUTPUT NEURON MODEL #
+# OUTPUT NEURON MODEL for precisely timed spikes #
 output_model = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
@@ -78,7 +78,7 @@ output_init = {"V": -60,
 
 # HIDDEN NEURON MODEL #
 
-NUM_HIDDEN = 4
+NUM_HIDDEN = 8
 
 hidden_model = create_custom_neuron_class(
     "lif_superspike",
@@ -139,3 +139,66 @@ hidden_init = {"V": -60,
                "z": 0.0,
                "z_tilda": 0.0,
                "err_output": 0.0}
+
+# OUTPUT NEURON MODEL for classifying patterns #
+
+output_model_classification = create_custom_neuron_class(
+    "lif_superspike",
+    param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
+                 "t_rise", "t_decay", "beta", "t_peak"],
+    var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
+                    ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
+                    ("mismatch", "scalar")],
+    sim_code="""
+    // membrane potential dynamics
+    if ($(RefracTime) == $(TauRefrac)) {
+        $(V) = $(Vrest);
+    }
+    if ($(RefracTime) <= 0.0) {
+        scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
+        $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+    }
+    else {
+        $(RefracTime) -= DT;
+    }
+    // filtered partial derivative
+    const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
+    $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
+    // error
+    $(mismatch) = 0.0;
+    if ($(window_of_opp) == 1.0) {
+        if ($(S_pred) == 0.0) {
+            const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
+            if (S_real == 1.0) {
+                $(mismatch) = -1.0
+            }
+        }
+    }
+    else {
+        if ($(S_miss) == 1.0) {
+            $(mismatch) = 1.0;
+        }
+    }
+    $(err_rise) = ($(err_rise) * $(t_rise_mult)) + $(mismatch);
+    $(err_decay) = ($(err_decay) * $(t_decay_mult)) + $(mismatch);
+    $(err_tilda) = ($(err_decay) - $(err_rise)) * $(norm_factor);
+    """,
+    reset_code="""
+    $(RefracTime) = $(TauRefrac);
+    """,
+    threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
+    derived_params=[
+        ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
+        ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])()),
+        ("norm_factor", create_dpf_class(lambda pars, dt:
+                                         1.0 / (- exp(- pars[9] / pars[6]) + exp(
+                                             - pars[9] / pars[7])))()),
+        ("t_rise_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[6]))()),
+        ("t_decay_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[7]))())
+    ],
+    extra_global_params=[("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar")]
+)
+
+# S_pred is 0/1 indicating if this is the target neuron -- should be considered only during window of opportunity
+# S_miss is 0/1 to indicate if this neuron should have fired during the window of opportunity and did not
+#                           -- should only be considered for one time step at the end of the window of opportunity

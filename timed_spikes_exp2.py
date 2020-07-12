@@ -10,8 +10,8 @@ from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, supe
 import os
 
 PRESENT_TIMESTEPS = 500.0
-# TRIALS = 2000
-TRIALS = 500
+TRIALS = 2000
+# TRIALS = 500
 
 ######### Set up spike source array type neuron for input population ############
 
@@ -102,6 +102,9 @@ inp2hid = model.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrap
                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
                                        "ExpCurr", {"tau": 5.0}, {})
 
+# hid2out_params = SUPERSPIKE_PARAMS
+# hid2out_params["r0"] = 0.1
+
 hid2out = model.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        hid, out,
                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
@@ -112,7 +115,7 @@ model.load()
 
 ######### Simulate #############
 
-IMG_DIR = "/home/manvi/Documents/gennzoo/imgs"
+IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_8_0.005"
 # IMG_DIR = "imgs"
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
@@ -251,7 +254,8 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             timesteps += int(PRESENT_TIMESTEPS * trial)
 
             # fig, axes = plt.subplots(4, sharex=True, figsize=(12, 10))
-            fig, axes = plt.subplots(3 + int(NUM_HIDDEN), sharex=True, figsize=(12, 10))
+            # fig, axes = plt.subplots(3 + int(NUM_HIDDEN), sharex=True, figsize=(12, 10))
+            fig, axes = plt.subplots(3, sharex=True, figsize=(12, 10))
             fig.tight_layout(pad=2.0)
 
 
@@ -277,13 +281,13 @@ while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
             # axes[2].plot(timesteps, mismatch)
             # axes[2].set_title("Mismatch")
 
-            for i in range(2, 6):
-                axes[i].plot(timesteps, hidden_V[i-2])
-                axes[i].set_title("Membrane potential of hidden neuron " + str(i - 2))
-                axes[i].axhline(y=HIDDEN_PARAMS["Vthresh"], linestyle="--", color="red")
+            # for i in range(2, 6):
+            #     axes[i].plot(timesteps, hidden_V[i-2])
+            #     axes[i].set_title("Membrane potential of hidden neuron " + str(i - 2))
+            #     axes[i].axhline(y=HIDDEN_PARAMS["Vthresh"], linestyle="--", color="red")
 
-            axes[6].scatter(spike_times, spike_ids, s=10)
-            axes[6].set_title("Input spikes")
+            axes[2].scatter(spike_times, spike_ids, s=10)
+            axes[2].set_title("Input spikes")
             # axes[4].plot(timesteps, wts_sum)
             # axes[4].set_title("Sum of weights of synapses")
 

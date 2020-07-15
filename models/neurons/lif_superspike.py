@@ -170,12 +170,12 @@ output_model_classification = create_custom_neuron_class(
         if ($(S_pred) == 0.0) {
             const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
             if (S_real == 1.0) {
-                $(mismatch) = -1.0
+                $(mismatch) = -1.0;
             }
         }
     }
     else {
-        if ($(S_miss) == 1.0) {
+        if ($(S_pred) == 1.0 && $(S_miss) == 1.0) {
             $(mismatch) = 1.0;
         }
     }
@@ -202,3 +202,5 @@ output_model_classification = create_custom_neuron_class(
 # S_pred is 0/1 indicating if this is the target neuron -- should be considered only during window of opportunity
 # S_miss is 0/1 to indicate if this neuron should have fired during the window of opportunity and did not
 #                           -- should only be considered for one time step at the end of the window of opportunity
+# window_of_opp is 0/1 to indicate if this timestep falls within the window of opportunity when the output neuron
+# is expected to react

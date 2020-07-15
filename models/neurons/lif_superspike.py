@@ -148,7 +148,8 @@ output_model_classification = create_custom_neuron_class(
                  "t_rise", "t_decay", "beta", "t_peak"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
-                    ("mismatch", "scalar")],
+                    ("mismatch", "scalar"),
+                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -195,9 +196,19 @@ output_model_classification = create_custom_neuron_class(
                                              - pars[9] / pars[7])))()),
         ("t_rise_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[6]))()),
         ("t_decay_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[7]))())
-    ],
-    extra_global_params=[("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar")]
+    ]
 )
+
+output_init_classification = {"V": -60,
+                              "RefracTime": 0.0,
+                              "sigma_prime": 0.0,
+                              "err_rise": 0.0,
+                              "err_decay": 0.0,
+                              "err_tilda": 0.0,
+                              "mismatch": 0.0,
+                              "S_pred": 0.0,
+                              "S_miss": 0.0,
+                              "window_of_opp": 0.0}
 
 # S_pred is 0/1 indicating if this is the target neuron -- should be considered only during window of opportunity
 # S_miss is 0/1 to indicate if this neuron should have fired during the window of opportunity and did not

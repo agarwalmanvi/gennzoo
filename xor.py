@@ -17,7 +17,6 @@ TRIALS = 2
 
 INPUT_NUM = [['time_ref', 34], ['inp0', 33], ['inp1', 33]]
 
-
 ###### Helper functions #######
 
 def create_poisson_spikes(interval, freq, spike_dt, n_input):
@@ -279,7 +278,6 @@ for trial in range(TRIALS):
 
     for idx_pop in range(len(INPUT_NUM)):
         pop_name = INPUT_NUM[idx_pop][0]
-        print(pop_name)
         pop_num = INPUT_NUM[idx_pop][1]
 
         poisson_spike, start_spike, end_spike = create_poisson_spikes(interval=wait_plus_iti,
@@ -288,8 +286,7 @@ for trial in range(TRIALS):
 
         temp_spikeTimes = np.hstack(poisson_spike).astype(float)
         temp_spikeTimes += time_elapsed
-        print(temp_spikeTimes)
-        print(input_pops[pop_name].extra_global_params['spikeTimes'].view[:])
+        input_pops[pop_name].extra_global_params['spikeTimes'].view[:] = np.resize(input_pops[pop_name].extra_global_params['spikeTimes'].view[:], len(temp_spikeTimes))
         input_pops[pop_name].extra_global_params['spikeTimes'].view[:] = temp_spikeTimes
         model.push_extra_global_param_to_device(pop_name, "spikeTimes")
 

@@ -78,8 +78,6 @@ output_init = {"V": -60,
 
 # HIDDEN NEURON MODEL #
 
-NUM_HIDDEN = 8
-
 hidden_model = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "t_rise", "t_decay"],
@@ -108,7 +106,7 @@ hidden_model = create_custom_neuron_class(
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
     // error
-    $(err_tilda) = $(err_output) * $(feedback_mult);
+    // $(err_tilda) = $(err_output) * $(feedback_mult);
     """,
     reset_code="""
     $(RefracTime) = $(TauRefrac);

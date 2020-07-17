@@ -5,7 +5,7 @@ superspike_model = create_custom_weight_update_class(
     "superspike_model",
     param_names=["t_rise", "t_decay", "tau_rms", "r0", "wmax", "wmin", "epsilon"],
     var_name_types=[("w", "scalar"), ("e", "scalar"), ("lambda", "scalar"), ("upsilon", "scalar"),
-                    ("m", "scalar")],
+                    ("m", "scalar"), ("trial_length", "scalar"), ("ExpRMS", "scalar")],
     sim_code="""
     $(addToInSyn, $(w));
     """,
@@ -18,9 +18,10 @@ superspike_model = create_custom_weight_update_class(
     const scalar g = $(lambda) * $(err_tilda_post);
     // at each time step, calculate m
     $(m) += g;
-    if ((int)round($(t)) % 500 == 0 && (int)round($(t)) != 0) {
+    if ((int)round($(t)) % (int)$(trial_length) == 0 && (int)round($(t)) != 0) {
         // calculate learning rate r
-        $(upsilon) = fmax($(upsilon) * $(ExpRMS) , (($(m) * $(m)) / 500.0));
+        $(ExpRMS) = exp( - $(trial_length) / $(lambda));
+        $(upsilon) = fmax($(upsilon) * $(ExpRMS) , (($(m) * $(m)) / $(trial_length)));
         // $(upsilon) = 1.0;
         $(upsilon) = fmax($(upsilon), $(epsilon));
         const scalar r = $(r0) / sqrt($(upsilon));
@@ -30,14 +31,14 @@ superspike_model = create_custom_weight_update_class(
     }
     """,
     derived_params=[
-        ("ExpRMS", create_dpf_class(lambda pars, dt: exp(- 500.0 / pars[2]))())
+        ("ExpRMS_old", create_dpf_class(lambda pars, dt: exp(- 500.0 / pars[2]))())
     ]
 )
 
 SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "t_decay": 10,
                      "tau_rms": 30,
-                     "r0": 0.01,
+                     "r0": 0.001,
                      "wmax": 10,
                      "wmin": -10,
                      "epsilon": 0.000000000000000000001}
@@ -46,4 +47,6 @@ superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                    "e": 0.0,
                    "lambda": 0.0,
                    "upsilon": 0.0,
-                   "m": 0.0}
+                   "m": 0.0,
+                   "trial_length": 0.0,
+                   "ExpRMS": 0.0}

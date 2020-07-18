@@ -10,6 +10,8 @@ from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, supe
 import os
 import random
 
+lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
+IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_" + lr
 
 def create_poisson_spikes(interval, freq, spike_dt):
     compare_num = freq * spike_dt
@@ -21,13 +23,13 @@ def create_poisson_spikes(interval, freq, spike_dt):
 STIMULUS_TIMESTEPS = 10
 WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
-TRIALS = 2500
-NUM_HIDDEN = 300
+TRIALS = 5
+NUM_HIDDEN = 100
 
-STIM_FREQ = 8
-WAIT_FREQ = 4
+STIM_FREQ = 20
+WAIT_FREQ = 10
 
-INPUT_NUM = [['time_ref', 34], ['inp0', 33], ['inp1', 33]]
+INPUT_NUM = [['time_ref', 2], ['inp0', 2], ['inp1', 2]]
 N_INPUT = sum([i[1] for i in INPUT_NUM])
 spike_dt = 0.001
 
@@ -189,85 +191,60 @@ for neuron_idx in range(INPUT_NUM[2][1]):
     # print("Poisson spikes")
     # print(poisson_spikes)
 
-# for p in range(N_INPUT):
-#
-#     neuron_poisson_spikes = np.empty(0)
-#
-#     time_elapsed = 0
-#
-#     for t in range(TRIALS):
-#
-#         sample_chosen = SAMPLES[0]
-#         # print("Sample chosen")
-#         # print(sample_chosen)
-#         iti_chosen = itis[t]
-#
-#         interval = WAIT_TIMESTEPS + iti_chosen
-#
-#         # create spike train for (i) stimulus presentation based on drawn samples
-#         # and (ii) inter-trial interval
-#
-#         if p < INPUT_NUM[0][1]:
-#             # time_ref population
-#             # always spikes at 8Hz during stimulus presentation
-#             spike_times = static_spikes_dict[p]
-#             spike_times += time_elapsed
-#             neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#             time_elapsed += STIMULUS_TIMESTEPS
-#
-#             # spikes at 4Hz in inter-trial interval
-#             spike_times = create_poisson_spikes(interval, freq, spike_dt)
-#             spike_times += time_elapsed
-#             neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#             time_elapsed += WAIT_TIMESTEPS + iti_chosen
-#
-#         # depending on sample chosen, inp0 and inp1 populations may or may not spike during stimulus presentation
-#
-#         elif INPUT_NUM[0][1] <= p < INPUT_NUM[0][1] + INPUT_NUM[1][1]:
-#             # inp0 population
-#             if sample_chosen[0] == 1:
-#                 spike_times = static_spikes_dict[p]
-#                 spike_times += time_elapsed
-#                 neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#             time_elapsed += STIMULUS_TIMESTEPS
-#
-#             # spikes at 4Hz in inter-trial interval
-#             spike_times = create_poisson_spikes(interval, freq, spike_dt)
-#             spike_times += time_elapsed
-#             neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#             time_elapsed += WAIT_TIMESTEPS + iti_chosen
-#
-#         else:
-#             # inp1 population
-#             if sample_chosen[1] == 1:
-#                 spike_times = static_spikes_dict[p]
-#                 spike_times += time_elapsed
-#                 neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#             time_elapsed += STIMULUS_TIMESTEPS
-#
-#             # spikes at 4Hz in inter-trial interval
-#             spike_times = create_poisson_spikes(interval, freq, spike_dt)
-#             spike_times += time_elapsed
-#             neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#             time_elapsed += WAIT_TIMESTEPS + iti_chosen
-#
-#     poisson_spikes.append(neuron_poisson_spikes)
+for i in range(len(poisson_spikes)):
+    print("Neuron: " + str(i))
+    print(poisson_spikes[i])
 
-# for i in range(len(poisson_spikes)):
-#     print("Neuron " + str(i))
-#     print(poisson_spikes[i])
+time_elapsed = 0
+for trial_num in range(TRIALS):
+    total = STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + itis[trial_num]
+    spike_times = np.empty(0)
+    spike_ids = np.empty(0)
+    for neuron_idx in range(N_INPUT):
+        neuron_spike_times = poisson_spikes[neuron_idx]
+        neuron_spike_times = neuron_spike_times[neuron_spike_times < total]
+        spike_times = np.hstack((spike_times, neuron_spike_times))
+        neuron_spike_id = np.full(shape=len(neuron_spike_times), fill_value=neuron_idx)
+        spike_ids = np.hstack((spike_ids, neuron_spike_id))
+
+    timesteps_plot = list(range(time_elapsed, time_elapsed + total))
+
+    num_plots = 1
+
+    fig, axes = plt.subplots(num_plots, sharex=True, figsize=(10, 8))
+
+    axes.scatter(spike_times, spike_ids)
+    axes.set_title("Input layer spikes")
+    axes.axhline(y=INPUT_NUM[0][1], color="gray", linestyle="--")
+    axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1], color="gray", linestyle="--")
+
+    axes.set_xlabel("Time [ms]")
+
+    axes.set_ylim(-1, N_INPUT+1)
+
+    save_filename = os.path.join(IMG_DIR, "trial" + str(trial_num) + "_original.png")
+    plt.savefig(save_filename)
+    plt.close()
+
+    time_elapsed += total
 
 spike_counts = [len(n) for n in poisson_spikes]
 end_spike = np.cumsum(spike_counts)
 start_spike = np.empty_like(end_spike)
 start_spike[0] = 0
 start_spike[1:] = end_spike[0:-1]
+
+spikeTimes = np.hstack(poisson_spikes).astype(float)
+
+print("spikeTimes: ")
+print(spikeTimes)
+
+print("start_spike")
+print(start_spike)
+
+print("end_spike")
+print(end_spike)
+
 
 ########### Custom spike source array neuron model ############
 
@@ -328,8 +305,6 @@ model.load()
 
 ######### Simulate #############
 
-lr = SUPERSPIKE_PARAMS["r0"]
-IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_" + str(lr)
 out_voltage = out.vars['V'].view
 inp_z_tilda = inp.vars["z_tilda"].view
 out_window_of_opp = out.vars["window_of_opp"].view
@@ -355,7 +330,7 @@ wts_hid2out = np.array([np.empty(0) for _ in range(NUM_HIDDEN * 2)])
 time_elapsed = 0
 
 # Incorporate this into the model -- should go in the weight update model
-feedback_wts = np.random.normal(size=(NUM_HIDDEN, 2))
+feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 2))
 
 for trial in range(TRIALS):
 
@@ -412,13 +387,12 @@ for trial in range(TRIALS):
     # hid_sigma_prime_arr = np.array([np.empty(0) for _ in range(NUM_HIDDEN)])
     # out_sigma_prime_arr = np.array([np.empty(0) for _ in range(2)])
 
-    for t in range(STIMULUS_TIMESTEPS):
+    out.vars["err_rise"].view[:] = 0.0
+    model.push_var_to_device('out', 'err_rise')
+    out.vars["err_decay"].view[:] = 0.0
+    model.push_var_to_device('out', 'err_decay')
 
-        # if t == 0:
-        #     out.vars["err_rise"].view[:] = 0.0
-        #     model.push_var_to_device('out', 'err_rise')
-        #     out.vars["err_decay"].view[:] = 0.0
-        #     model.push_var_to_device('out', 'err_decay')
+    for t in range(STIMULUS_TIMESTEPS):
 
         model.pull_var_from_device("out", "err_tilda")
         err_output = out.vars["err_tilda"].view[:]
@@ -603,37 +577,39 @@ for trial in range(TRIALS):
 
     timesteps_plot = list(range(t_start, time_elapsed))
 
-    num_plots = 4
+    num_plots = 1
 
     fig, axes = plt.subplots(num_plots, sharex=True, figsize=(10, 8))
 
-    axes[0].plot(timesteps_plot, out0_err, color="royalblue")
-    axes[0].plot(timesteps_plot, out1_err, color="magenta")
-    axes[0].set_title("Error of output neurons")
+    # axes[0].plot(timesteps_plot, out0_err, color="royalblue")
+    # axes[0].plot(timesteps_plot, out1_err, color="magenta")
+    # axes[0].set_title("Error of output neurons")
+    #
+    # axes[1].plot(timesteps_plot, out0_V, color="royalblue")
+    # axes[1].plot(timesteps_plot, out1_V, color="magenta")
+    # axes[1].set_title("Membrane voltage of output neurons")
+    # axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
+    # for i in produced_spikes:
+    #     axes[1].axvline(x=i, color="red", linestyle="--")
+    # axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
+    #                 color="green", linestyle="--")
 
-    axes[1].plot(timesteps_plot, out0_V, color="royalblue")
-    axes[1].plot(timesteps_plot, out1_V, color="magenta")
-    axes[1].set_title("Membrane voltage of output neurons")
-    axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
-    for i in produced_spikes:
-        axes[1].axvline(x=i, color="red", linestyle="--")
-    axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
-                    color="green", linestyle="--")
+    axes.scatter(inp_spike_times, inp_spike_ids)
+    axes.set_title("Input layer spikes")
+    axes.axhline(y=INPUT_NUM[0][1], color="gray", linestyle="--")
+    axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1], color="gray", linestyle="--")
 
-    axes[2].scatter(inp_spike_times, inp_spike_ids)
-    axes[2].set_title("Input layer spikes")
-    axes[2].axhline(y=INPUT_NUM[0][1], color="gray", linestyle="--")
-    axes[2].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1], color="gray", linestyle="--")
+    # axes[3].scatter(hid_spike_times, hid_spike_ids)
+    # axes[3].set_title("Hidden layer spikes")
+    #
+    # c = 'royalblue' if target == 0 else 'magenta'
+    #
+    # for i in range(num_plots):
+    #     axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
 
-    axes[3].scatter(hid_spike_times, hid_spike_ids)
-    axes[3].set_title("Hidden layer spikes")
-
-    c = 'royalblue' if target == 0 else 'magenta'
-
-    for i in range(num_plots):
-        axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
-
-    axes[-1].set_xlabel("Time [ms]")
+    # axes[-1].set_xlabel("Time [ms]")
+    axes.set_xlabel("Time [ms]")
+    axes.set_ylim(-1, N_INPUT + 1)
 
     save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
     plt.savefig(save_filename)
@@ -666,27 +642,27 @@ for trial in range(TRIALS):
     # plt.savefig(save_filename)
     # plt.close()
 
-print("Creating wts_inp2hid")
-plt.figure()
-plt.imshow(wts_inp2hid, cmap='gray')
-plt.colorbar()
-plt.yticks(list(range(wts_inp2hid.shape[0])))
-plt.xticks(list(range(wts_inp2hid.shape[1])))
-save_filename = os.path.join(IMG_DIR, "wts_inp2hid.png")
-plt.savefig(save_filename)
-plt.close()
-print("Creating wts_hid2out")
-plt.figure()
-plt.imshow(wts_hid2out, cmap='gray')
-plt.colorbar()
-plt.yticks(list(range(wts_hid2out.shape[0])))
-plt.xticks(list(range(wts_hid2out.shape[1])))
-save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
-plt.savefig(save_filename)
-plt.close()
-
-print(np.amax(wts_inp2hid))
-print(np.min(wts_inp2hid))
-
-print(np.amax(wts_hid2out))
-print(np.amin(wts_hid2out))
+# print("Creating wts_inp2hid")
+# plt.figure()
+# plt.imshow(wts_inp2hid, cmap='gray')
+# plt.colorbar()
+# plt.yticks(list(range(wts_inp2hid.shape[0])))
+# plt.xticks(list(range(wts_inp2hid.shape[1])))
+# save_filename = os.path.join(IMG_DIR, "wts_inp2hid.png")
+# plt.savefig(save_filename)
+# plt.close()
+# print("Creating wts_hid2out")
+# plt.figure()
+# plt.imshow(wts_hid2out, cmap='gray')
+# plt.colorbar()
+# plt.yticks(list(range(wts_hid2out.shape[0])))
+# plt.xticks(list(range(wts_hid2out.shape[1])))
+# save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
+# plt.savefig(save_filename)
+# plt.close()
+#
+# print(np.amax(wts_inp2hid))
+# print(np.min(wts_inp2hid))
+#
+# print(np.amax(wts_hid2out))
+# print(np.amin(wts_hid2out))

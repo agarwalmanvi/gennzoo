@@ -5,7 +5,8 @@ superspike_model = create_custom_weight_update_class(
     "superspike_model",
     param_names=["t_rise", "t_decay", "tau_rms", "r0", "wmax", "wmin", "epsilon"],
     var_name_types=[("w", "scalar"), ("e", "scalar"), ("lambda", "scalar"), ("upsilon", "scalar"),
-                    ("m", "scalar"), ("trial_length", "scalar"), ("ExpRMS", "scalar")],
+                    ("m", "scalar"), ("trial_length", "scalar"), ("ExpRMS", "scalar"), ('reset_t', "scalar"),
+                    ("trial_end_t", "scalar")],
     sim_code="""
     $(addToInSyn, $(w));
     """,
@@ -18,7 +19,8 @@ superspike_model = create_custom_weight_update_class(
     const scalar g = $(lambda) * $(err_tilda_post);
     // at each time step, calculate m
     $(m) += g;
-    if ((int)round($(t)) % (int)$(trial_length) == 0 && (int)round($(t)) != 0) {
+    if ((int)round($(t)) % (int)$(trial_end_t) == 0 && (int)round($(t)) != 0) {
+        $(reset_t) = $(t);
         // calculate learning rate r
         $(ExpRMS) = exp( - $(trial_length) / $(lambda));
         $(upsilon) = fmax($(upsilon) * $(ExpRMS) , (($(m) * $(m)) / $(trial_length)));
@@ -49,4 +51,6 @@ superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                    "upsilon": 0.0,
                    "m": 0.0,
                    "trial_length": 0.0,
-                   "ExpRMS": 0.0}
+                   "ExpRMS": 0.0,
+                   "reset_t": 0.0,
+                   "trial_end_t": 0.0}

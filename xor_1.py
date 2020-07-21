@@ -11,7 +11,7 @@ import os
 import random
 
 lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
-IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_" + lr
+IMG_DIR = "/home/p286814/pygenn/gennzoo_cluster/imgs_xor_" + lr
 
 def create_poisson_spikes(interval, freq, spike_dt):
     compare_num = freq * spike_dt
@@ -23,13 +23,13 @@ def create_poisson_spikes(interval, freq, spike_dt):
 STIMULUS_TIMESTEPS = 10
 WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
-TRIALS = 5
-NUM_HIDDEN = 100
+TRIALS = 3500
+NUM_HIDDEN = 200
 
-STIM_FREQ = 20
-WAIT_FREQ = 10
+STIM_FREQ = 100
+WAIT_FREQ = 4
 
-INPUT_NUM = [['time_ref', 2], ['inp0', 2], ['inp1', 2]]
+INPUT_NUM = [['time_ref', 34], ['inp0', 33], ['inp1', 33]]
 N_INPUT = sum([i[1] for i in INPUT_NUM])
 spike_dt = 0.001
 
@@ -64,8 +64,6 @@ SAMPLES = [(0, 0, 0),
            (1, 1, 0)]
 
 drawn_samples = np.random.choice(np.arange(4), size=TRIALS)
-
-# drawn_samples = np.full(shape=TRIALS, fill_value=2)
 
 poisson_spikes = []
 
@@ -164,7 +162,7 @@ for neuron_idx in range(INPUT_NUM[2][1]):
         # print(trial_num)
 
         if SAMPLES[drawn_samples[trial_num]][1] == 1:
-            spike_times = np.array(static_spikes_arr[neuron_idx + INPUT_NUM[0][1]] + INPUT_NUM[1][1])
+            spike_times = np.array(static_spikes_arr[neuron_idx + INPUT_NUM[0][1] + INPUT_NUM[1][1]])
             # print(spike_times)
             spike_times += time_elapsed
             # print("Spike times")
@@ -191,42 +189,57 @@ for neuron_idx in range(INPUT_NUM[2][1]):
     # print("Poisson spikes")
     # print(poisson_spikes)
 
-for i in range(len(poisson_spikes)):
-    print("Neuron: " + str(i))
-    print(poisson_spikes[i])
+# for i in range(len(poisson_spikes)):
+#     print("Neuron: " + str(i))
+#     print(poisson_spikes[i])
+#
+# time_elapsed = 0
+# for trial_num in range(TRIALS):
+#     total = STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + itis[trial_num]
+#     t_start = time_elapsed
+#     t_end = time_elapsed + total
+#     spike_times = np.empty(0)
+#     spike_ids = np.empty(0)
+#     for neuron_idx in range(N_INPUT):
+#         neuron_spike_times = poisson_spikes[neuron_idx]
+#         neuron_spike_times = neuron_spike_times[t_start < neuron_spike_times]
+#         neuron_spike_times = neuron_spike_times[neuron_spike_times <= t_end]
+#         spike_times = np.hstack((spike_times, neuron_spike_times))
+#         neuron_spike_id = np.full(shape=len(neuron_spike_times), fill_value=neuron_idx)
+#         spike_ids = np.hstack((spike_ids, neuron_spike_id))
+#
+#     timesteps_plot = list(range(t_start+1, t_end+1, 5))
+#
+#     num_plots = 1
+#
+#     fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
+#
+#     # print("Spike times in trial" + str(trial_num))
+#     # print(spike_times)
+#     # print("Spike ids in trial" + str(trial_num))
+#     # print(spike_ids)
+#
+#     axes.scatter(spike_times, spike_ids)
+#     axes.set_title("Input layer spikes")
+#     axes.axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
+#     axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
+#     axes.axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
+#     axes.axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS, color="green", linestyle="--")
+#
+#     axes.set_xlabel("Time [ms]")
+#
+#     axes.set_ylim(-1, N_INPUT+1)
+#     # axes.set_xlim(t_start+1, t_end+1)
+#     axes.set_xticks(timesteps_plot)
+#
+#     save_filename = os.path.join(IMG_DIR, "trial" + str(trial_num) + "_original.png")
+#     plt.savefig(save_filename)
+#     plt.close()
+#
+#     time_elapsed += total
 
-time_elapsed = 0
-for trial_num in range(TRIALS):
-    total = STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + itis[trial_num]
-    spike_times = np.empty(0)
-    spike_ids = np.empty(0)
-    for neuron_idx in range(N_INPUT):
-        neuron_spike_times = poisson_spikes[neuron_idx]
-        neuron_spike_times = neuron_spike_times[neuron_spike_times < total]
-        spike_times = np.hstack((spike_times, neuron_spike_times))
-        neuron_spike_id = np.full(shape=len(neuron_spike_times), fill_value=neuron_idx)
-        spike_ids = np.hstack((spike_ids, neuron_spike_id))
-
-    timesteps_plot = list(range(time_elapsed, time_elapsed + total))
-
-    num_plots = 1
-
-    fig, axes = plt.subplots(num_plots, sharex=True, figsize=(10, 8))
-
-    axes.scatter(spike_times, spike_ids)
-    axes.set_title("Input layer spikes")
-    axes.axhline(y=INPUT_NUM[0][1], color="gray", linestyle="--")
-    axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1], color="gray", linestyle="--")
-
-    axes.set_xlabel("Time [ms]")
-
-    axes.set_ylim(-1, N_INPUT+1)
-
-    save_filename = os.path.join(IMG_DIR, "trial" + str(trial_num) + "_original.png")
-    plt.savefig(save_filename)
-    plt.close()
-
-    time_elapsed += total
+    # print("Time elapsed at the end of trial" + str(trial_num))
+    # print(time_elapsed)
 
 spike_counts = [len(n) for n in poisson_spikes]
 end_spike = np.cumsum(spike_counts)
@@ -236,14 +249,14 @@ start_spike[1:] = end_spike[0:-1]
 
 spikeTimes = np.hstack(poisson_spikes).astype(float)
 
-print("spikeTimes: ")
-print(spikeTimes)
-
-print("start_spike")
-print(start_spike)
-
-print("end_spike")
-print(end_spike)
+# print("spikeTimes: ")
+# print(spikeTimes)
+#
+# print("start_spike")
+# print(start_spike)
+#
+# print("end_spike")
+# print(end_spike)
 
 
 ########### Custom spike source array neuron model ############
@@ -266,7 +279,7 @@ ssa_input_model = genn_model.create_custom_neuron_class(
     $(startSpike)++;
     $(z) += 1.0;
     """,
-    threshold_condition_code="$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",
+    threshold_condition_code="$(startSpike) != $(endSpike) && $(t)>= $(spikeTimes)[$(startSpike)]",
     extra_global_params=[("spikeTimes", "scalar*")],
     is_auto_refractory_required=False
 )
@@ -345,11 +358,11 @@ for trial in range(TRIALS):
     inp_z_tilda[:] = ssa_input_init["z_tilda"]
     model.push_var_to_device("inp", "z_tilda")
 
-    # out_err_tilda[:] = 0.0
-    # model.push_var_to_device('out', 'err_tilda')
-    #
-    # hid_err_tilda[:] = 0.0
-    # model.push_var_to_device('hid', 'err_tilda')
+    out_err_tilda[:] = 0.0
+    model.push_var_to_device('out', 'err_tilda')
+
+    hid_err_tilda[:] = 0.0
+    model.push_var_to_device('hid', 'err_tilda')
 
     inp2hid_trial_length[:] = float(STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + iti_chosen)
     model.push_var_to_device("inp2hid", "trial_length")
@@ -563,53 +576,104 @@ for trial in range(TRIALS):
 
     time_elapsed += iti_chosen
 
-    model.pull_var_from_device("inp2hid", "w")
-    weights = inp2hid.get_var_values("w")
-    weights = np.reshape(weights, (weights.shape[0], 1))
-    wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
-
-    model.pull_var_from_device("hid2out", "w")
-    weights = hid2out.get_var_values("w")
-    weights = np.reshape(weights, (weights.shape[0], 1))
-    wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
+    # model.pull_var_from_device("inp2hid", "w")
+    # weights = inp2hid.get_var_values("w")
+    # weights = np.reshape(weights, (weights.shape[0], 1))
+    # wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
+    #
+    # model.pull_var_from_device("hid2out", "w")
+    # weights = hid2out.get_var_values("w")
+    # weights = np.reshape(weights, (weights.shape[0], 1))
+    # wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
 
     # print("Creating plot")
 
+    # timesteps_plot = list(range(t_start, time_elapsed, 5))
+    #
+    # num_plots = 1
+    #
+    # fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
+    #
+    # # axes[0].plot(timesteps_plot, out0_err, color="royalblue")
+    # # axes[0].plot(timesteps_plot, out1_err, color="magenta")
+    # # axes[0].set_title("Error of output neurons")
+    # #
+    # # axes[1].plot(timesteps_plot, out0_V, color="royalblue")
+    # # axes[1].plot(timesteps_plot, out1_V, color="magenta")
+    # # axes[1].set_title("Membrane voltage of output neurons")
+    # # axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
+    # # for i in produced_spikes:
+    # #     axes[1].axvline(x=i, color="red", linestyle="--")
+    # # axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
+    # #                 color="green", linestyle="--")
+    #
+    # axes.scatter(inp_spike_times, inp_spike_ids)
+    # axes.set_title("Input layer spikes")
+    # axes.axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
+    # axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
+    # axes.axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
+    # axes.axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
+    #
+    # # axes[3].scatter(hid_spike_times, hid_spike_ids)
+    # # axes[3].set_title("Hidden layer spikes")
+    # #
+    # # c = 'royalblue' if target == 0 else 'magenta'
+    # #
+    # # for i in range(num_plots):
+    # #     axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
+    #
+    # # axes[-1].set_xlabel("Time [ms]")
+    # axes.set_xlabel("Time [ms]")
+    # axes.set_ylim(-1, N_INPUT + 1)
+    # axes.set_xticks(timesteps_plot)
+    #
+    # save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
+    # plt.savefig(save_filename)
+    # plt.close()
+
+    ########## FULL PLOT #############
+
     timesteps_plot = list(range(t_start, time_elapsed))
 
-    num_plots = 1
+    num_plots = 4
 
-    fig, axes = plt.subplots(num_plots, sharex=True, figsize=(10, 8))
+    fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
 
-    # axes[0].plot(timesteps_plot, out0_err, color="royalblue")
-    # axes[0].plot(timesteps_plot, out1_err, color="magenta")
-    # axes[0].set_title("Error of output neurons")
-    #
-    # axes[1].plot(timesteps_plot, out0_V, color="royalblue")
-    # axes[1].plot(timesteps_plot, out1_V, color="magenta")
-    # axes[1].set_title("Membrane voltage of output neurons")
-    # axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
-    # for i in produced_spikes:
-    #     axes[1].axvline(x=i, color="red", linestyle="--")
-    # axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
-    #                 color="green", linestyle="--")
+    axes[0].plot(timesteps_plot, out0_err, color="royalblue")
+    axes[0].plot(timesteps_plot, out1_err, color="magenta")
+    axes[0].set_ylim(-1, 1)
+    axes[0].set_title("Error of output neurons")
 
-    axes.scatter(inp_spike_times, inp_spike_ids)
-    axes.set_title("Input layer spikes")
-    axes.axhline(y=INPUT_NUM[0][1], color="gray", linestyle="--")
-    axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1], color="gray", linestyle="--")
+    axes[1].plot(timesteps_plot, out0_V, color="royalblue")
+    axes[1].plot(timesteps_plot, out1_V, color="magenta")
+    axes[1].set_title("Membrane voltage of output neurons")
+    axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
+    for i in produced_spikes:
+        axes[1].axvline(x=i, color="red", linestyle="--")
+    axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
+                    color="green", linestyle="--")
 
-    # axes[3].scatter(hid_spike_times, hid_spike_ids)
-    # axes[3].set_title("Hidden layer spikes")
-    #
-    # c = 'royalblue' if target == 0 else 'magenta'
-    #
-    # for i in range(num_plots):
-    #     axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
+    axes[2].scatter(inp_spike_times, inp_spike_ids)
+    axes[2].set_ylim(-1, N_INPUT + 1)
+    axes[2].set_title("Input layer spikes")
+    axes[2].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
+    axes[2].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
+    # axes[2].axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
+    axes[2].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
 
-    # axes[-1].set_xlabel("Time [ms]")
-    axes.set_xlabel("Time [ms]")
-    axes.set_ylim(-1, N_INPUT + 1)
+    axes[3].scatter(hid_spike_times, hid_spike_ids)
+    axes[3].set_ylim(-1, NUM_HIDDEN + 1)
+    axes[3].set_title("Hidden layer spikes")
+
+    c = 'royalblue' if target == 0 else 'magenta'
+
+    for i in range(num_plots):
+        axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
+
+    axes[-1].set_xlabel("Time [ms]")
+    # axes.set_xlabel("Time [ms]")
+    x_ticks_plot = list(range(t_start, time_elapsed, 5))
+    axes[-1].set_xticks(x_ticks_plot)
 
     save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
     plt.savefig(save_filename)

@@ -235,8 +235,12 @@ feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 2))
 
 for trial in range(TRIALS):
 
-    if trial % 1 == 0:
+    if trial % 100 == 0:
         print("Trial: " + str(trial))
+
+    # model.pull_var_from_device("hid2out", "w")
+    # h2o_weights = hid2out.get_var_values("w")
+    # feedback_wts = np.reshape(h2o_weights, newshape=(NUM_HIDDEN, 2))
 
     iti_chosen = itis[trial]
 
@@ -528,9 +532,11 @@ for trial in range(TRIALS):
     wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
 
     model.pull_var_from_device("hid2out", "w")
-    weights = hid2out.get_var_values("w")
-    weights = np.reshape(weights, (weights.shape[0], 1))
+    h2o_weights = hid2out.get_var_values("w")
+    weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
     wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
+
+    # feedback_wts = np.reshape(h2o_weights, newshape=(NUM_HIDDEN, 2))
 
     # print("Creating plot")
 

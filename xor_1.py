@@ -12,7 +12,7 @@ import random
 import pickle as pkl
 
 lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
-IMG_DIR = "/home/p286814/pygenn/gennzoo_cluster/imgs_xor_" + lr
+IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
 
 def create_poisson_spikes(interval, freq, spike_dt):
     compare_num = freq * spike_dt
@@ -24,7 +24,7 @@ def create_poisson_spikes(interval, freq, spike_dt):
 STIMULUS_TIMESTEPS = 10
 WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
-TRIALS = 8000
+TRIALS = 40
 NUM_HIDDEN = 100
 
 STIM_FREQ = 100
@@ -217,25 +217,15 @@ out_err_tilda = out.vars['err_tilda'].view
 wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * NUM_HIDDEN)])
 wts_hid2out = np.array([np.empty(0) for _ in range(NUM_HIDDEN * 2)])
 
-# hid_err_output_view = hid.vars['err_output'].view
-
-# hid_sigma_prime = hid.vars["sigma_prime"].view
-# out_sigma_prime = out.vars["sigma_prime"].view
-
-# hid_z_tilda = hid.vars['z_tilda'].view
-# out_sigma_prime = out.vars['sigma_prime'].view
-# hid2out_lambda = hid2out.vars["lambda"].view
 
 time_elapsed = 0
 
 # Incorporate this into the model -- should go in the weight update model
 feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 2))
 
-# streak = 0
-
 for trial in range(TRIALS):
 
-    if trial % 100 == 0:
+    if trial % 1 == 0:
         print("Trial: " + str(trial))
 
     # model.pull_var_from_device("hid2out", "w")
@@ -243,6 +233,9 @@ for trial in range(TRIALS):
     # feedback_wts = np.reshape(h2o_weights, newshape=(NUM_HIDDEN, 2))
 
     iti_chosen = itis[trial]
+
+    # temp: record hidden membrane potential
+    hid_V = [np.empty(0) for _ in range(NUM_HIDDEN)]
 
     out_voltage[:] = OUTPUT_PARAMS["Vrest"]
     model.push_var_to_device('out', "V")
@@ -261,9 +254,6 @@ for trial in range(TRIALS):
 
     hid2out_trial_length[:] = float(STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + iti_chosen)
     model.push_var_to_device("hid2out", "trial_length")
-
-    # print("Pushing trial_end_t")
-    # print(float(time_elapsed + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + iti_chosen - 1))
 
     inp2hid_trial_end_t[:] = float(time_elapsed + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + iti_chosen - 1)
     model.push_var_to_device("inp2hid", "trial_end_t")
@@ -298,22 +288,12 @@ for trial in range(TRIALS):
     hid_spike_ids = np.empty(0)
     hid_spike_times = np.empty(0)
 
-    # hid_sigma_prime_arr = np.array([np.empty(0) for _ in range(NUM_HIDDEN)])
-    # out_sigma_prime_arr = np.array([np.empty(0) for _ in range(2)])
-
     out.vars["err_rise"].view[:] = 0.0
     model.push_var_to_device('out', 'err_rise')
     out.vars["err_decay"].view[:] = 0.0
     model.push_var_to_device('out', 'err_decay')
 
-    # error_sum = 0
-    # print("\n")
-    # print("Stimulus presentation")
-    # print("\n")
-
     for t in range(STIMULUS_TIMESTEPS):
-
-        # print("Timestep: " + str(t) + "\t" + "Time elapsed: " + str(time_elapsed))
 
         model.pull_var_from_device("out", "err_tilda")
         err_output = out.vars["err_tilda"].view[:]
@@ -323,22 +303,10 @@ for trial in range(TRIALS):
 
         model.step_time()
 
-        # print("Reset moment for inp2hid")
-        # model.pull_var_from_device("inp2hid", "reset_t")
-        # print(inp2hid.get_var_values("reset_t"))
-        # print("Reset moment for hid2out")
-        # model.pull_var_from_device("hid2out", "reset_t")
-        # print(inp2hid.get_var_values("reset_t"))
-
-        # model.pull_var_from_device("inp2hid", "z_tilda_pre")
-        # m = inp2hid.get_var_values("z_tilda_pre")
-        # m = np.reshape(m, (m.shape[0], 1))
-        # m_inp2hid = np.concatenate((m_inp2hid, m), axis=1)
-        #
-        # model.pull_var_from_device("hid2out", "z_tilda_pre")
-        # m = hid2out.get_var_values("z_tilda_pre")
-        # m = np.reshape(m, (m.shape[0], 1))
-        # m_hid2out = np.concatenate((m_hid2out, m), axis=1)
+        model.pull_var_from_device('hid', 'V')
+        current_hid_V = hid.vars['V'].view[:]
+        for i in range(NUM_HIDDEN):
+            hid_V[i] = np.hstack((hid_V[i], current_hid_V[i]))
 
         model.pull_current_spikes_from_device("out")
         if target in out.current_spikes:
@@ -352,13 +320,6 @@ for trial in range(TRIALS):
         out0_err = np.hstack((out0_err, out.vars["err_tilda"].view[0]))
         out1_err = np.hstack((out1_err, out.vars["err_tilda"].view[1]))
 
-        # error_sum += np.sum(out.vars["err_tilda"].view[:])
-
-        # if t == 0:
-        #     print(out0_err)
-        #     print(out1_err)
-        #     print(out_err_tilda[:])
-
         model.pull_current_spikes_from_device("inp")
         times = np.ones_like(inp.current_spikes) * model.t
         inp_spike_ids = np.hstack((inp_spike_ids, inp.current_spikes))
@@ -368,25 +329,10 @@ for trial in range(TRIALS):
         times = np.ones_like(hid.current_spikes) * model.t
         hid_spike_ids = np.hstack((hid_spike_ids, hid.current_spikes))
         hid_spike_times = np.hstack((hid_spike_times, times))
-
-        # model.pull_var_from_device("hid", "sigma_prime")
-        # sigma_prime = hid_sigma_prime[:]
-        # sigma_prime = np.reshape(sigma_prime, (sigma_prime.shape[0], 1))
-        # hid_sigma_prime_arr = np.concatenate((hid_sigma_prime_arr, sigma_prime), axis=1)
-        # model.pull_var_from_device("out", "sigma_prime")
-        # sigma_prime = out_sigma_prime[:]
-        # sigma_prime = np.reshape(sigma_prime, (sigma_prime.shape[0], 1))
-        # out_sigma_prime_arr = np.concatenate((out_sigma_prime_arr, sigma_prime), axis=1)
 
     time_elapsed += STIMULUS_TIMESTEPS
 
-    # print("\n")
-    # print("Wait timesteps: ")
-    # print("\n")
-
     for t in range(WAIT_TIMESTEPS):
-
-        # print("Timestep: " + str(t) + "\t" + "Time elapsed: " + str(time_elapsed))
 
         model.pull_var_from_device("out", "err_tilda")
         err_output = out.vars["err_tilda"].view[:]
@@ -396,22 +342,10 @@ for trial in range(TRIALS):
 
         model.step_time()
 
-        # print("Reset moment for inp2hid")
-        # model.pull_var_from_device("inp2hid", "reset_t")
-        # print(inp2hid.get_var_values("reset_t"))
-        # print("Reset moment for hid2out")
-        # model.pull_var_from_device("hid2out", "reset_t")
-        # print(inp2hid.get_var_values("reset_t"))
-
-        # model.pull_var_from_device("inp2hid", "z_tilda_pre")
-        # m = inp2hid.get_var_values("z_tilda_pre")
-        # m = np.reshape(m, (m.shape[0], 1))
-        # m_inp2hid = np.concatenate((m_inp2hid, m), axis=1)
-        #
-        # model.pull_var_from_device("hid2out", "z_tilda_pre")
-        # m = hid2out.get_var_values("z_tilda_pre")
-        # m = np.reshape(m, (m.shape[0], 1))
-        # m_hid2out = np.concatenate((m_hid2out, m), axis=1)
+        model.pull_var_from_device('hid', 'V')
+        current_hid_V = hid.vars['V'].view[:]
+        for i in range(NUM_HIDDEN):
+            hid_V[i] = np.hstack((hid_V[i], current_hid_V[i]))
 
         model.pull_current_spikes_from_device("out")
         if target in out.current_spikes:
@@ -425,8 +359,6 @@ for trial in range(TRIALS):
         out0_err = np.hstack((out0_err, out.vars["err_tilda"].view[0]))
         out1_err = np.hstack((out1_err, out.vars["err_tilda"].view[1]))
 
-        # error_sum += np.sum(out.vars["err_tilda"].view[:])
-
         model.pull_current_spikes_from_device("inp")
         times = np.ones_like(inp.current_spikes) * model.t
         inp_spike_ids = np.hstack((inp_spike_ids, inp.current_spikes))
@@ -436,15 +368,6 @@ for trial in range(TRIALS):
         times = np.ones_like(hid.current_spikes) * model.t
         hid_spike_ids = np.hstack((hid_spike_ids, hid.current_spikes))
         hid_spike_times = np.hstack((hid_spike_times, times))
-
-        # model.pull_var_from_device("hid", "sigma_prime")
-        # sigma_prime = hid_sigma_prime[:]
-        # sigma_prime = np.reshape(sigma_prime, (sigma_prime.shape[0], 1))
-        # hid_sigma_prime_arr = np.concatenate((hid_sigma_prime_arr, sigma_prime), axis=1)
-        # model.pull_var_from_device("out", "sigma_prime")
-        # sigma_prime = out_sigma_prime[:]
-        # sigma_prime = np.reshape(sigma_prime, (sigma_prime.shape[0], 1))
-        # out_sigma_prime_arr = np.concatenate((out_sigma_prime_arr, sigma_prime), axis=1)
 
     out_window_of_opp[:] = 0.0
     model.push_var_to_device("out", "window_of_opp")
@@ -455,13 +378,7 @@ for trial in range(TRIALS):
 
     time_elapsed += WAIT_TIMESTEPS
 
-    # print("\n")
-    # print("Intertrial Interval: ")
-    # print("\n")
-
     for t in range(iti_chosen):
-
-        # print("Timestep: " + str(t) + "\t" + "Time elapsed: " + str(time_elapsed))
 
         model.pull_var_from_device("out", "err_tilda")
         err_output = out.vars["err_tilda"].view[:]
@@ -471,22 +388,10 @@ for trial in range(TRIALS):
 
         model.step_time()
 
-        # print("Reset moment for inp2hid")
-        # model.pull_var_from_device("inp2hid", "reset_t")
-        # print(inp2hid.get_var_values("reset_t"))
-        # print("Reset moment for hid2out")
-        # model.pull_var_from_device("hid2out", "reset_t")
-        # print(inp2hid.get_var_values("reset_t"))
-
-        # model.pull_var_from_device("inp2hid", "z_tilda_pre")
-        # m = inp2hid.get_var_values("z_tilda_pre")
-        # m = np.reshape(m, (m.shape[0], 1))
-        # m_inp2hid = np.concatenate((m_inp2hid, m), axis=1)
-
-        # model.pull_var_from_device("hid2out", "m")
-        # m = hid2out.get_var_values("m")
-        # m = np.reshape(m, (m.shape[0], 1))
-        # m_hid2out = np.concatenate((m_hid2out, m), axis=1)
+        model.pull_var_from_device('hid', 'V')
+        current_hid_V = hid.vars['V'].view[:]
+        for i in range(NUM_HIDDEN):
+            hid_V[i] = np.hstack((hid_V[i], current_hid_V[i]))
 
         if t == 0:
             out_S_miss[:] = 0.0
@@ -500,8 +405,6 @@ for trial in range(TRIALS):
         out0_err = np.hstack((out0_err, out.vars["err_tilda"].view[0]))
         out1_err = np.hstack((out1_err, out.vars["err_tilda"].view[1]))
 
-        # error_sum += np.sum(out.vars["err_tilda"].view[:])
-
         model.pull_current_spikes_from_device("inp")
         times = np.ones_like(inp.current_spikes) * model.t
         inp_spike_ids = np.hstack((inp_spike_ids, inp.current_spikes))
@@ -512,19 +415,7 @@ for trial in range(TRIALS):
         hid_spike_ids = np.hstack((hid_spike_ids, hid.current_spikes))
         hid_spike_times = np.hstack((hid_spike_times, times))
 
-        # model.pull_var_from_device("hid", "sigma_prime")
-        # sigma_prime = hid_sigma_prime[:]
-        # sigma_prime = np.reshape(sigma_prime, (sigma_prime.shape[0], 1))
-        # hid_sigma_prime_arr = np.concatenate((hid_sigma_prime_arr, sigma_prime), axis=1)
-        # model.pull_var_from_device("out", "sigma_prime")
-        # sigma_prime = out_sigma_prime[:]
-        # sigma_prime = np.reshape(sigma_prime, (sigma_prime.shape[0], 1))
-        # out_sigma_prime_arr = np.concatenate((out_sigma_prime_arr, sigma_prime), axis=1)
-
     time_elapsed += iti_chosen
-
-    # if error_sum == 0:
-    #     streak += 1
 
     model.pull_var_from_device("inp2hid", "w")
     weights = inp2hid.get_var_values("w")
@@ -536,86 +427,43 @@ for trial in range(TRIALS):
     weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
     wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
 
-    # feedback_wts = np.reshape(h2o_weights, newshape=(NUM_HIDDEN, 2))
-
-    # print("Creating plot")
-
-    # timesteps_plot = list(range(t_start, time_elapsed, 5))
-    #
-    # num_plots = 1
-    #
-    # fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
-    #
-    # # axes[0].plot(timesteps_plot, out0_err, color="royalblue")
-    # # axes[0].plot(timesteps_plot, out1_err, color="magenta")
-    # # axes[0].set_title("Error of output neurons")
-    # #
-    # # axes[1].plot(timesteps_plot, out0_V, color="royalblue")
-    # # axes[1].plot(timesteps_plot, out1_V, color="magenta")
-    # # axes[1].set_title("Membrane voltage of output neurons")
-    # # axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
-    # # for i in produced_spikes:
-    # #     axes[1].axvline(x=i, color="red", linestyle="--")
-    # # axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
-    # #                 color="green", linestyle="--")
-    #
-    # axes.scatter(inp_spike_times, inp_spike_ids)
-    # axes.set_title("Input layer spikes")
-    # axes.axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
-    # axes.axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
-    # axes.axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
-    # axes.axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
-    #
-    # # axes[3].scatter(hid_spike_times, hid_spike_ids)
-    # # axes[3].set_title("Hidden layer spikes")
-    # #
-    # # c = 'royalblue' if target == 0 else 'magenta'
-    # #
-    # # for i in range(num_plots):
-    # #     axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
-    #
-    # # axes[-1].set_xlabel("Time [ms]")
-    # axes.set_xlabel("Time [ms]")
-    # axes.set_ylim(-1, N_INPUT + 1)
-    # axes.set_xticks(timesteps_plot)
-    #
-    # save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
-    # plt.savefig(save_filename)
-    # plt.close()
-
     ########## FULL PLOT #############
 
     timesteps_plot = list(range(t_start, time_elapsed))
 
-    num_plots = 4
+    num_plots = 2
 
     fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
 
-    axes[0].plot(timesteps_plot, out0_err, color="royalblue")
-    axes[0].plot(timesteps_plot, out1_err, color="magenta")
-    axes[0].set_ylim(-1, 1)
-    axes[0].set_title("Error of output neurons")
+    # axes[0].plot(timesteps_plot, out0_err, color="royalblue")
+    # axes[0].plot(timesteps_plot, out1_err, color="magenta")
+    # axes[0].set_ylim(-1, 1)
+    # axes[0].set_title("Error of output neurons")
 
-    axes[1].plot(timesteps_plot, out0_V, color="royalblue")
-    axes[1].plot(timesteps_plot, out1_V, color="magenta")
-    axes[1].set_title("Membrane voltage of output neurons")
-    axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
-    for i in produced_spikes:
-        axes[1].axvline(x=i, color="red", linestyle="--")
-    axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
-                    color="green", linestyle="--")
+    # axes[1].plot(timesteps_plot, out0_V, color="royalblue")
+    # axes[1].plot(timesteps_plot, out1_V, color="magenta")
+    # axes[1].set_title("Membrane voltage of output neurons")
+    # axes[1].axhline(y=OUTPUT_PARAMS["Vthresh"])
+    # for i in produced_spikes:
+    #     axes[1].axvline(x=i, color="red", linestyle="--")
+    # axes[1].axvline(x=t_start+STIMULUS_TIMESTEPS+WAIT_TIMESTEPS,
+    #                 color="green", linestyle="--")
 
-    axes[2].scatter(inp_spike_times, inp_spike_ids)
-    axes[2].set_ylim(-1, N_INPUT + 1)
-    axes[2].set_title("Input layer spikes")
-    axes[2].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
-    axes[2].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
+    axes[0].scatter(inp_spike_times, inp_spike_ids)
+    axes[0].set_ylim(-1, N_INPUT + 1)
+    axes[0].set_title("Input layer spikes")
+    axes[0].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
+    axes[0].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
     # axes[2].axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
-    axes[2].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
+    axes[0].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
 
-    axes[3].scatter(hid_spike_times, hid_spike_ids)
-    axes[3].set_ylim(-1, NUM_HIDDEN + 1)
-    axes[3].set_title("Hidden layer spikes")
+    for i in range(NUM_HIDDEN):
+        axes[1].plot(timesteps_plot, hid_V[i])
+    axes[1].set_title('Hidden layer membrane potentials')
+
+    # axes[3].scatter(hid_spike_times, hid_spike_ids)
+    # axes[3].set_ylim(-1, NUM_HIDDEN + 1)
+    # axes[3].set_title("Hidden layer spikes")
 
     c = 'royalblue' if target == 0 else 'magenta'
 
@@ -631,35 +479,8 @@ for trial in range(TRIALS):
     plt.savefig(save_filename)
     plt.close()
 
-    # print("Range of hid_sigma_prime")
-    # print(np.amin(hid_sigma_prime_arr))
-    # print(np.amax(hid_sigma_prime_arr))
-    #
-    # print("Range of out_sigma_prime")
-    # print(np.amin(out_sigma_prime_arr))
-    # print(np.amax(out_sigma_prime_arr))
-    #
-    # print("Creating hid_sigma_prime_arr")
-    # plt.figure(figsize=(8, 15))
-    # plt.imshow(hid_sigma_prime_arr, cmap='gray')
-    # plt.colorbar()
-    # plt.yticks(list(range(hid_sigma_prime_arr.shape[0])))
-    # plt.xticks(list(range(hid_sigma_prime_arr.shape[1])))
-    # save_filename = os.path.join(IMG_DIR, "hid_sigma_prime_arr"+str(trial)+".png")
-    # plt.savefig(save_filename)
-    # plt.close()
-    # print("Creating out_sigma_prime_arr")
-    # plt.figure(figsize=(8, 15))
-    # plt.imshow(out_sigma_prime_arr, cmap='gray')
-    # plt.colorbar()
-    # plt.yticks(list(range(out_sigma_prime_arr.shape[0])))
-    # plt.xticks(list(range(out_sigma_prime_arr.shape[1])))
-    # save_filename = os.path.join(IMG_DIR, "out_sigma_prime_arr"+str(trial)+".png")
-    # plt.savefig(save_filename)
-    # plt.close()
-
 print("Creating wts_inp2hid")
-plt.figure()
+plt.figure(figsize=(20, 50))
 plt.imshow(wts_inp2hid, cmap='gray')
 plt.colorbar()
 plt.yticks(list(range(wts_inp2hid.shape[0])))
@@ -676,9 +497,3 @@ plt.xticks(list(range(wts_hid2out.shape[1])))
 save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
 plt.savefig(save_filename)
 plt.close()
-#
-# print(np.amax(wts_inp2hid))
-# print(np.min(wts_inp2hid))
-#
-# print(np.amax(wts_hid2out))
-# print(np.amin(wts_hid2out))

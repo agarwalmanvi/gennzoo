@@ -31,15 +31,15 @@ STIM_FREQ = 100
 wmax = SUPERSPIKE_PARAMS['wmax']
 
 lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
-model_name = lr + "_" + str(STIM_FREQ)
-# IMG_DIR = "/home/p286814/pygenn/gennzoo_cluster/imgs_xor_" + model_name
-IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
+model_name = lr + "_" + str(int(wmax))
+IMG_DIR = "/home/p286814/pygenn/gennzoo_cluster/imgs_xor_" + model_name
+# IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
 
 
 STIMULUS_TIMESTEPS = 10
 WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
-TRIALS = 100
+TRIALS = 150
 NUM_HIDDEN = 100
 WAIT_FREQ = 4
 
@@ -80,7 +80,7 @@ SAMPLES = [(0, 0, 0),
 
 drawn_samples = np.random.choice(np.arange(4), size=TRIALS)
 
-##### Build poisson spikes for all neuron ######
+##### Build poisson spikes for all neurons ######
 
 # poisson_spikes is a list of N_INPUT lists: each list is the spike times for each neuron
 poisson_spikes = []
@@ -129,13 +129,54 @@ start_spike[1:] = end_spike[0:-1]
 
 spikeTimes = np.hstack(poisson_spikes).astype(float)
 
-# test_spike_counts = [len(n) for n in test_poisson_spikes]
-# test_end_spike = np.cumsum(test_spike_counts)
-# test_start_spike = np.empty_like(test_end_spike)
-# test_start_spike[0] = 0
-# test_start_spike[1:] = test_end_spike[0:-1]
-#
-# test_spikeTimes = np.hstack(test_poisson_spikes).astype(float)
+##### Build test poisson spikes for all neurons ######
+
+# poisson_spikes is a list of N_INPUT lists: each list is the spike times for each neuron
+test_poisson_spikes = []
+
+for neuron_idx in range(N_INPUT):
+    time_elapsed = 0
+    neuron_poisson_spikes = np.empty(0)
+
+    for sample_idx in range(len(SAMPLES)):
+
+        if neuron_idx < INPUT_NUM[0][1]:
+
+            spike_times = np.array(static_spikes_arr[neuron_idx])
+            spike_times += time_elapsed
+            neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+
+        elif INPUT_NUM[0][1] <= neuron_idx < INPUT_NUM[0][1] + INPUT_NUM[1][1]:
+
+            if SAMPLES[sample_idx][0] == 1:
+                spike_times = np.array(static_spikes_arr[neuron_idx])
+                spike_times += time_elapsed
+                neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+
+        else:
+
+            if SAMPLES[sample_idx][1] == 1:
+                spike_times = np.array(static_spikes_arr[neuron_idx])
+                spike_times += time_elapsed
+                neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+
+        time_elapsed += STIMULUS_TIMESTEPS
+        wait_plus_iti = WAIT_TIMESTEPS + 55
+
+        spike_times = create_poisson_spikes(wait_plus_iti, WAIT_FREQ, spike_dt)
+        spike_times += time_elapsed
+        neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+        time_elapsed += wait_plus_iti
+
+    test_poisson_spikes.append(neuron_poisson_spikes)
+
+test_spike_counts = [len(n) for n in test_poisson_spikes]
+test_end_spike = np.cumsum(test_spike_counts)
+test_start_spike = np.empty_like(test_end_spike)
+test_start_spike[0] = 0
+test_start_spike[1:] = test_end_spike[0:-1]
+
+test_spikeTimes = np.hstack(test_poisson_spikes).astype(float)
 
 ########### Custom spike source array neuron model ############
 
@@ -169,19 +210,19 @@ ssa_input_init = {"startSpike": start_spike,
                   "z": 0.0,
                   "z_tilda": 0.0}
 
-# test_ssa_input_init = {"startSpike": test_start_spike,
-#                        "endSpike": test_end_spike}
-#
-# test_lif_init = {"V": -60.0,
-#                  "RefracTime": 0.0}
-#
-# TEST_LIF_PARAMS = {"C": 10.0,
-#                    "TauM": 10.0,
-#                    "Vrest": -60.0,
-#                    "Vreset": -60.0,
-#                    "Vthresh": -50.0,
-#                    "Ioffset": 0.0,
-#                    "TauRefrac": 5.0}
+test_ssa_input_init = {"startSpike": test_start_spike,
+                       "endSpike": test_end_spike}
+
+test_lif_init = {"V": -60.0,
+                 "RefracTime": 0.0}
+
+TEST_LIF_PARAMS = {"C": 10.0,
+                   "TauM": 10.0,
+                   "Vrest": -60.0,
+                   "Vreset": -60.0,
+                   "Vthresh": -50.0,
+                   "Ioffset": 0.0,
+                   "TauRefrac": 5.0}
 
 ########### Build model ################
 model = genn_model.GeNNModel("float", model_name)
@@ -233,14 +274,15 @@ time_elapsed = 0
 # feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 2))
 
 # Record best network config encountered so far
-# best_wts = {'inp2hid': 0,
-#             'hid2out': 0}
-# best_err = np.inf
-# best_acc = 0
+best_wts = {'inp2hid': 0,
+            'hid2out': 0}
+best_err = np.inf
+best_acc = 0
+best_trial = 0
 
 for trial in range(TRIALS):
 
-    if trial % 1 == 0:
+    if trial % 100 == 0:
         print("Trial: " + str(trial))
 
     # Important to record for this trial
@@ -308,7 +350,7 @@ for trial in range(TRIALS):
     hid_spike_times = np.empty(0)
 
     produced_spikes = []
-    # err_sum = 0
+    err_sum = 0
 
     for t in range(total_time):
 
@@ -344,7 +386,7 @@ for trial in range(TRIALS):
         out0_err = np.hstack((out0_err, out.vars["err_tilda"].view[0]))
         out1_err = np.hstack((out1_err, out.vars["err_tilda"].view[1]))
 
-        # err_sum += np.sum(np.abs(out.vars["err_tilda"].view[:]))
+        err_sum += np.sum(np.abs(out.vars["err_tilda"].view[:]))
 
         model.pull_current_spikes_from_device("inp")
         times = np.ones_like(inp.current_spikes) * model.t
@@ -370,85 +412,80 @@ for trial in range(TRIALS):
     # wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
 
     # ############ TESTING ###########
-    #
-    # if err_sum <= best_err:
-    #
-    #     print("New best error found: ")
-    #     print(err_sum)
-    #
-    #     best_err = err_sum
-    #
-    #     model.pull_var_from_device("inp2hid", "w")
-    #     i2h_weights = inp2hid.get_var_values("w")
-    #     model.pull_var_from_device("hid2out", "w")
-    #     h2o_weights = hid2out.get_var_values("w")
-    #
-    #     test_network = genn_model.GeNNModel("float", "test_network")
-    #     test_network.dT = 1.0
-    #
-    #     test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
-    #                                                   test_ssa_input_init)
-    #     # spikeTimes = np.hstack(poisson_spikes).astype(float)
-    #     test_inp.set_extra_global_param("spikeTimes", test_spikeTimes)
-    #
-    #     test_hid = test_network.add_neuron_population("hid", NUM_HIDDEN, "LIF", TEST_LIF_PARAMS, test_lif_init)
-    #
-    #     test_out = test_network.add_neuron_population("out", 2, "LIF", TEST_LIF_PARAMS,
-    #                                                   test_lif_init)
-    #
-    #     test_inp2hid = test_network.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
-    #                                                        test_inp, test_hid,
-    #                                                        "StaticPulse", {}, {"g": i2h_weights.flatten()}, {}, {},
-    #                                                        "ExpCurr", {"tau": 5.0}, {})
-    #
-    #     test_hid2out = test_network.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
-    #                                                        test_hid, test_out,
-    #                                                        "StaticPulse", {}, {"g": h2o_weights.flatten()}, {}, {},
-    #                                                        "ExpCurr", {"tau": 5.0}, {})
-    #
-    #     test_network.build()
-    #     test_network.load()
-    #
-    #     num_correct = 0
-    #
-    #     for sample_idx in range(len(SAMPLES)):
-    #
-    #         target = SAMPLES[sample_idx][-1]
-    #         non_target = np.abs(target - 1.0)
-    #
-    #         target_spikes = []
-    #         non_target_spikes = []
-    #
-    #         for t in range(STIMULUS_TIMESTEPS + WAIT_TIMESTEPS):
-    #
-    #             test_network.step_time()
-    #             test_network.pull_current_spikes_from_device("out")
-    #             if target in test_out.current_spikes:
-    #                 target_spikes.append(model.t)
-    #             if non_target in test_out.current_spikes:
-    #                 non_target_spikes.append(model.t)
-    #
-    #         for i in range(55):
-    #
-    #             test_network.step_time()
-    #
-    #         if len(target_spikes) != 0 and len(non_target_spikes) == 0:
-    #
-    #             num_correct += 1
-    #
-    #     accuracy = num_correct / 4
-    #
-    #     print("Accuracy: " + str(accuracy) + "%")
-    #
-    #     if accuracy > best_acc:
-    #         test_network.pull_var_from_device("inp2hid", "g")
-    #         best_wts['inp2hid'] = test_inp2hid.get_var_values("g")
-    #         test_network.pull_var_from_device("hid2out", "g")
-    #         best_wts['hid2out'] = test_hid2out.get_var_values("g")
+
+    if err_sum <= best_err:
+
+        best_err = err_sum
+
+        model.pull_var_from_device("inp2hid", "w")
+        i2h_weights = inp2hid.get_var_values("w")
+        model.pull_var_from_device("hid2out", "w")
+        h2o_weights = hid2out.get_var_values("w")
+
+        test_network = genn_model.GeNNModel("float", "test_network")
+        test_network.dT = 1.0
+
+        test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
+                                                      test_ssa_input_init)
+        test_inp.set_extra_global_param("spikeTimes", test_spikeTimes)
+
+        test_hid = test_network.add_neuron_population("hid", NUM_HIDDEN, "LIF", TEST_LIF_PARAMS, test_lif_init)
+
+        test_out = test_network.add_neuron_population("out", 2, "LIF", TEST_LIF_PARAMS,
+                                                      test_lif_init)
+
+        test_inp2hid = test_network.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+                                                           test_inp, test_hid,
+                                                           "StaticPulse", {}, {"g": i2h_weights.flatten()}, {}, {},
+                                                           "ExpCurr", {"tau": 5.0}, {})
+
+        test_hid2out = test_network.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+                                                           test_hid, test_out,
+                                                           "StaticPulse", {}, {"g": h2o_weights.flatten()}, {}, {},
+                                                           "ExpCurr", {"tau": 5.0}, {})
+
+        test_network.build()
+        test_network.load()
+
+        num_correct = 0
+
+        # test_time_elapsed = 0
+
+        for sample_idx in range(len(SAMPLES)):
+
+            target = SAMPLES[sample_idx][-1]
+            non_target = 1 - target
+
+            target_spikes = []
+            non_target_spikes = []
+
+            for t in range(STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + 55):
+
+                test_network.step_time()
+
+                if t < STIMULUS_TIMESTEPS + WAIT_TIMESTEPS:
+                    test_network.pull_current_spikes_from_device("out")
+                    if target in test_out.current_spikes:
+                        target_spikes.append(test_network.t)
+                    if non_target in test_out.current_spikes:
+                        non_target_spikes.append(test_network.t)
+
+            if len(target_spikes) != 0 and len(non_target_spikes) == 0:
+                num_correct += 1
+
+        accuracy = num_correct / 4
+
+        if accuracy > best_acc:
+            test_network.pull_var_from_device("inp2hid", "g")
+            best_wts['inp2hid'] = test_inp2hid.get_var_values("g")
+            test_network.pull_var_from_device("hid2out", "g")
+            best_wts['hid2out'] = test_hid2out.get_var_values("g")
+            best_acc = accuracy
+            best_trial = trial
 
     ########## Make plots similar to Fig. 5b from the paper #############
 
-    if trial >= 0:
+    if (3000 <= trial < 6000 and trial % 10 == 0) or (trial >= 6000):
 
         timesteps_plot = list(range(t_start, time_elapsed))
 
@@ -518,16 +555,20 @@ for trial in range(TRIALS):
 # plt.savefig(save_filename)
 # plt.close()
 
-# pkl_dict = {'wmax': SUPERSPIKE_PARAMS['wmax'],
-#             'wmin': SUPERSPIKE_PARAMS['wmin'],
-#             'trials': TRIALS,
-#             'hidden_num': NUM_HIDDEN,
-#             'inp2hid': best_wts['inp2hid'],
-#             'hid2out': best_wts['hid2out']}
-#
-# filename = os.path.join(IMG_DIR, 'config.pkl')
-#
-# with open(filename, 'wb') as f:
-#     pkl.dump(pkl_dict, f)
-#
-# print("Complete.")
+pkl_dict = {'wmax': SUPERSPIKE_PARAMS['wmax'],
+            'wmin': SUPERSPIKE_PARAMS['wmin'],
+            'trials': TRIALS,
+            'hidden_num': NUM_HIDDEN,
+            'learning_rate': SUPERSPIKE_PARAMS['r0'],
+            'best_trial': best_trial,
+            'feedback': 'symmetric',
+            'best_acc': best_acc,
+            'inp2hid': best_wts['inp2hid'],
+            'hid2out': best_wts['hid2out']}
+
+filename = os.path.join(IMG_DIR, 'config.pkl')
+
+with open(filename, 'wb') as f:
+    pkl.dump(pkl_dict, f)
+
+print("Complete.")

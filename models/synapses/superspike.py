@@ -39,9 +39,9 @@ superspike_model = create_custom_weight_update_class(
 SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "t_decay": 10,
                      "tau_rms": 30,
-                     "r0": 0.01,
-                     "wmax": 0.5,
-                     "wmin": -0.5,
+                     "r0": 0.005,
+                     "wmax": 3.0,
+                     "wmin": -3.0,
                      "epsilon": 0.000000000000000000001}
 
 superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),

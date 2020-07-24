@@ -213,3 +213,5 @@ output_init_classification = {"V": -60,
 #                           -- should only be considered for one time step at the end of the window of opportunity
 # window_of_opp is 0/1 to indicate if this timestep falls within the window of opportunity when the output neuron
 # is expected to react
+
+

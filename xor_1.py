@@ -32,6 +32,7 @@ wmax = SUPERSPIKE_PARAMS['wmax']
 
 lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
 model_name = lr + "_" + str(int(wmax))
+# model_name = "test_2607"
 IMG_DIR = "/home/p286814/pygenn/gennzoo_cluster/imgs_xor_" + model_name
 # IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
 
@@ -39,7 +40,7 @@ IMG_DIR = "/home/p286814/pygenn/gennzoo_cluster/imgs_xor_" + model_name
 STIMULUS_TIMESTEPS = 10
 WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
-TRIALS = 150
+TRIALS = 10000
 NUM_HIDDEN = 100
 WAIT_FREQ = 4
 
@@ -252,7 +253,6 @@ model.load()
 
 # Access variables during training time
 out_voltage = out.vars['V'].view
-inp_z_tilda = inp.vars["z_tilda"].view
 out_window_of_opp = out.vars["window_of_opp"].view
 out_S_pred = out.vars['S_pred'].view
 out_S_miss = out.vars['S_miss'].view
@@ -262,6 +262,12 @@ inp2hid_trial_end_t = inp2hid.vars["trial_end_t"].view
 hid2out_trial_end_t = hid2out.vars["trial_end_t"].view
 hid_err_tilda = hid.vars['err_tilda'].view
 out_err_tilda = out.vars['err_tilda'].view
+
+inp_z = inp.vars['z'].view
+inp_z_tilda = inp.vars["z_tilda"].view
+hid_z = hid.vars['z'].view
+hid_z_tilda = hid.vars['z_tilda'].view
+hid_voltage = hid.vars['V'].view
 
 # Data structures for recording weights at the end of every trial
 # wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * NUM_HIDDEN)])
@@ -282,7 +288,7 @@ best_trial = 0
 
 for trial in range(TRIALS):
 
-    if trial % 100 == 0:
+    if trial % 1 == 0:
         print("Trial: " + str(trial))
 
     # Important to record for this trial
@@ -300,8 +306,16 @@ for trial in range(TRIALS):
     out_voltage[:] = OUTPUT_PARAMS["Vrest"]
     model.push_var_to_device('out', "V")
 
+    inp_z[:] = ssa_input_init['z']
+    model.push_var_to_device("inp", "z")
     inp_z_tilda[:] = ssa_input_init["z_tilda"]
     model.push_var_to_device("inp", "z_tilda")
+    hid_z[:] = hidden_init['z']
+    model.push_var_to_device("hid", "z")
+    hid_z_tilda[:] = hidden_init['z_tilda']
+    model.push_var_to_device("hid", "z_tilda")
+    hid_voltage[:] = HIDDEN_PARAMS["Vrest"]
+    model.push_var_to_device("hid", "V")
 
     out_err_tilda[:] = 0.0
     model.push_var_to_device('out', 'err_tilda')
@@ -422,7 +436,7 @@ for trial in range(TRIALS):
         model.pull_var_from_device("hid2out", "w")
         h2o_weights = hid2out.get_var_values("w")
 
-        test_network = genn_model.GeNNModel("float", "test_network")
+        test_network = genn_model.GeNNModel("float", "test_network" + model_name)
         test_network.dT = 1.0
 
         test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
@@ -486,6 +500,7 @@ for trial in range(TRIALS):
     ########## Make plots similar to Fig. 5b from the paper #############
 
     if (3000 <= trial < 6000 and trial % 10 == 0) or (trial >= 6000):
+    # if trial % 1 == 0:
 
         timesteps_plot = list(range(t_start, time_elapsed))
 
@@ -512,10 +527,6 @@ for trial in range(TRIALS):
         axes[2].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
         # axes[2].axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
         axes[2].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
-
-        # for i in range(NUM_HIDDEN):
-        #     axes[1].plot(timesteps_plot, hid_V[i])
-        # axes[1].set_title('Hidden layer membrane potentials')
 
         axes[3].scatter(hid_spike_times, hid_spike_ids)
         axes[3].set_ylim(-1, NUM_HIDDEN + 1)

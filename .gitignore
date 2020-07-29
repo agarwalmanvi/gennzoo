@@ -11,3 +11,5 @@ imgs
 *.txt
 test.py
 *.pkl
+prep.py
+*.out

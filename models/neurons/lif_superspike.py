@@ -148,18 +148,22 @@ output_model_classification = create_custom_neuron_class(
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
                     ("mismatch", "scalar"),
-                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar")],
+                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar"),
+                    ("did_i_spike", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
         $(V) = $(Vrest);
+        $(did_i_spike) = 1.0;
     }
     if ($(RefracTime) <= 0.0) {
         scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
         $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+        $(did_i_spike) = 0.0;
     }
     else {
         $(RefracTime) -= DT;
+        $(did_i_spike) = 0.0;
     }
     // filtered partial derivative
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
@@ -207,7 +211,8 @@ output_init_classification = {"V": -60,
                               "mismatch": 0.0,
                               "S_pred": 0.0,
                               "S_miss": 0.0,
-                              "window_of_opp": 0.0}
+                              "window_of_opp": 0.0,
+                              "did_i_spike": 0.0}
 
 # S_pred is 0/1 indicating if this is the target neuron -- should be considered only during window of opportunity
 # S_miss is 0/1 to indicate if this neuron should have fired during the window of opportunity and did not
@@ -220,5 +225,3 @@ output_init_classification = {"V": -60,
 feedback_postsyn_model = create_custom_postsynaptic_class(
     "Feedback",
     apply_input_code="$(ISynFeedback) += $(inSyn); $(inSyn) = 0;")
-
-

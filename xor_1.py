@@ -8,7 +8,8 @@ from models.neurons.lif_superspike import (output_model_classification, OUTPUT_P
                                            hidden_model, HIDDEN_PARAMS, hidden_init,
                                            feedback_postsyn_model)
 from models.synapses.superspike import (superspike_model, SUPERSPIKE_PARAMS, superspike_init,
-                                        feedback_wts_model, feedback_wts_init)
+                                        feedback_wts_model, feedback_wts_init,
+                                        superspike_reg_model, SUPERSPIKE_REG_PARAMS, superspike_reg_init)
 import os
 import random
 import pickle as pkl
@@ -264,9 +265,14 @@ inp2hid = model.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrap
                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
                                        "ExpCurr", {"tau": 5.0}, {})
 
+# hid2out = model.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+#                                        hid, out,
+#                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
+#                                        "ExpCurr", {"tau": 5.0}, {})
+
 hid2out = model.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        hid, out,
-                                       superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
+                                       superspike_reg_model, SUPERSPIKE_REG_PARAMS, superspike_reg_init, {}, {},
                                        "ExpCurr", {"tau": 5.0}, {})
 
 out2hid = model.add_synapse_population("out2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
@@ -321,7 +327,7 @@ best_err = np.inf
 best_acc = 0
 best_trial = 0
 
-plot_interval = 1
+plot_interval = 10
 
 for trial in range(TRIALS):
 
@@ -406,7 +412,7 @@ for trial in range(TRIALS):
         hid_spike_ids = np.empty(0)
         hid_spike_times = np.empty(0)
 
-        hid_err_tilda_arr = [np.empty(0) for _ in range(NUM_HIDDEN)]
+        z_fir_rate_arr = [np.empty(0) for _ in range(NUM_HIDDEN * 2)]
 
     produced_spikes = []
     err_sum = 0
@@ -460,10 +466,10 @@ for trial in range(TRIALS):
             out0_err = np.hstack((out0_err, out.vars["err_tilda"].view[0]))
             out1_err = np.hstack((out1_err, out.vars["err_tilda"].view[1]))
 
-            model.pull_var_from_device("hid", "err_tilda")
-            hid_err_tilda_new = hid_err_tilda[:]
-            for i in range(NUM_HIDDEN):
-                hid_err_tilda_arr[i] = np.hstack((hid_err_tilda_arr[i], hid_err_tilda_new[i]))
+            model.pull_var_from_device("hid2out", "z_fir_rate")
+            z_fir_rate_new = hid2out.vars['z_fir_rate'].view[:]
+            for i in range(NUM_HIDDEN * 2):
+                z_fir_rate_arr[i] = np.hstack((z_fir_rate_arr[i], z_fir_rate_new[i]))
 
     time_elapsed += total_time
 
@@ -652,9 +658,9 @@ for trial in range(TRIALS):
         axes[3].set_ylim(-1, NUM_HIDDEN + 1)
         axes[3].set_title("Hidden layer spikes")
 
-        for i in range(NUM_HIDDEN):
-            axes[4].plot(timesteps_plot, hid_err_tilda_arr[i])
-        axes[4].set_title("Hidden err_tilda")
+        for i in range(NUM_HIDDEN * 2):
+            axes[4].plot(timesteps_plot, z_fir_rate_arr[i])
+        axes[4].set_title("Hidden to output z_fir_rate")
 
         c = 'royalblue' if target == 0 else 'magenta'
 

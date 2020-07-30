@@ -35,8 +35,8 @@ def create_poisson_spikes(interval, freq, spike_dt, time_factor):
 wmax = SUPERSPIKE_PARAMS['wmax']
 lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
 model_name = lr + "_" + str(int(wmax))
-# IMG_DIR = "/data/p286814/runs_3007/imgs_xor_" + model_name
-IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
+IMG_DIR = "/data/p286814/imgs_xor_test"
+# IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
 
 MODEL_BUILD_DIR = os.environ.get('TMPDIR')
 
@@ -48,7 +48,7 @@ WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
 TEST_ITI = 55
 
-TRIALS = 100
+TRIALS = 1000
 NUM_HIDDEN = 100
 WAIT_FREQ = 4  # Hz
 STIM_FREQ = 100  # Hz
@@ -57,12 +57,12 @@ INPUT_NUM = [['time_ref', 34], ['inp0', 33], ['inp1', 33]]
 N_INPUT = sum([i[1] for i in INPUT_NUM])
 spike_dt = 0.001  # 1 ms
 
-# dump dummy object to test if script is able to access and dump things into directory
-test_obj = {'a': 'test',
-            'b': 'test'}
-
-with open(os.path.join(IMG_DIR, "test.pkl"), 'wb') as f:
-    pkl.dump(test_obj, f)
+# # dump dummy object to test if script is able to access and dump things into directory
+# test_obj = {'a': 'test',
+#             'b': 'test'}
+#
+# with open(os.path.join(IMG_DIR, "test.pkl"), 'wb') as f:
+#     pkl.dump(test_obj, f)
 
 ####### Create poisson spike trains for all input neurons and all trials ###########
 
@@ -234,20 +234,20 @@ ssa_input_init = {"startSpike": start_spike,
                   "endSpike": end_spike,
                   "z": 0.0,
                   "z_tilda": 0.0}
-
-test_ssa_input_init = {"startSpike": test_start_spike,
-                       "endSpike": test_end_spike}
-
-test_lif_init = {"V": -60.0,
-                 "RefracTime": 0.0}
-
-TEST_LIF_PARAMS = {"C": 10.0,
-                   "TauM": 10.0,
-                   "Vrest": -60.0,
-                   "Vreset": -60.0,
-                   "Vthresh": -50.0,
-                   "Ioffset": 0.0,
-                   "TauRefrac": 5.0}
+#
+# test_ssa_input_init = {"startSpike": test_start_spike,
+#                        "endSpike": test_end_spike}
+#
+# test_lif_init = {"V": -60.0,
+#                  "RefracTime": 0.0}
+#
+# TEST_LIF_PARAMS = {"C": 10.0,
+#                    "TauM": 10.0,
+#                    "Vrest": -60.0,
+#                    "Vreset": -60.0,
+#                    "Vthresh": -50.0,
+#                    "Ioffset": 0.0,
+#                    "TauRefrac": 5.0}
 
 ########### Build model ################
 model = genn_model.GeNNModel("float", model_name)
@@ -280,11 +280,11 @@ out2hid = model.add_synapse_population("out2hid", "DENSE_INDIVIDUALG", genn_wrap
                                        feedback_wts_model, {}, feedback_wts_init, {}, {},
                                        feedback_postsyn_model, {}, {})
 
-# model.build(path_to_model=MODEL_BUILD_DIR)
-# model.load(path_to_model=MODEL_BUILD_DIR + "/")
+model.build(path_to_model=MODEL_BUILD_DIR)
+model.load(path_to_model=MODEL_BUILD_DIR + "/")
 
-model.build()
-model.load()
+# model.build()
+# model.load()
 
 # print("Built main model")
 
@@ -320,18 +320,18 @@ time_elapsed = 0
 # Random feedback
 # feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 2))
 
-# Record best network config encountered so far
-best_wts = {'inp2hid': 0,
-            'hid2out': 0}
-best_err = np.inf
-best_acc = 0
-best_trial = 0
+# # Record best network config encountered so far
+# best_wts = {'inp2hid': 0,
+#             'hid2out': 0}
+# best_err = np.inf
+# best_acc = 0
+# best_trial = 0
 
-plot_interval = 10
+plot_interval = 2
 
 for trial in range(TRIALS):
 
-    if trial % 1 == 0:
+    if trial % 10 == 0:
         print("Trial: " + str(trial))
 
     # Important to record for this trial
@@ -364,6 +364,14 @@ for trial in range(TRIALS):
     model.push_var_to_device("hid", "z_tilda")
     hid_voltage[:] = HIDDEN_PARAMS["Vrest"]
     model.push_var_to_device("hid", "V")
+    hid2out.vars['lambda'].view[:] = 0.0
+    model.push_var_to_device("hid2out", "lambda")
+    inp2hid.vars['lambda'].view[:] = 0.0
+    model.push_var_to_device("inp2hid", "lambda")
+    hid2out.vars['e'].view[:] = 0.0
+    model.push_var_to_device("hid2out", "e")
+    inp2hid.vars['e'].view[:] = 0.0
+    model.push_var_to_device("inp2hid", "e")
 
     out_err_tilda[:] = 0.0
     model.push_var_to_device('out', 'err_tilda')
@@ -415,7 +423,7 @@ for trial in range(TRIALS):
         z_fir_rate_arr = [np.empty(0) for _ in range(NUM_HIDDEN * 2)]
 
     produced_spikes = []
-    err_sum = 0
+    # err_sum = 0
 
     steps = int(total_time / TIME_FACTOR)
 
@@ -445,7 +453,7 @@ for trial in range(TRIALS):
         if target in out.current_spikes:
             produced_spikes.append(model.t)
 
-        err_sum += np.sum(np.abs(out.vars["err_tilda"].view[:]))
+        # err_sum += np.sum(np.abs(out.vars["err_tilda"].view[:]))
 
         if trial % plot_interval == 0:
             model.pull_current_spikes_from_device("inp")
@@ -696,20 +704,20 @@ save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
 plt.savefig(save_filename)
 plt.close()
 
-pkl_dict = {'wmax': SUPERSPIKE_PARAMS['wmax'],
-            'wmin': SUPERSPIKE_PARAMS['wmin'],
-            'trials': TRIALS,
-            'hidden_num': NUM_HIDDEN,
-            'learning_rate': SUPERSPIKE_PARAMS['r0'],
-            'best_trial': best_trial,
-            'feedback': 'symmetric',
-            'best_acc': best_acc,
-            'inp2hid': best_wts['inp2hid'],
-            'hid2out': best_wts['hid2out']}
-
-filename = os.path.join(IMG_DIR, 'config.pkl')
-
-with open(os.path.join(IMG_DIR, "config.pkl"), 'wb') as fi:
-    pkl.dump(pkl_dict, fi)
+# pkl_dict = {'wmax': SUPERSPIKE_PARAMS['wmax'],
+#             'wmin': SUPERSPIKE_PARAMS['wmin'],
+#             'trials': TRIALS,
+#             'hidden_num': NUM_HIDDEN,
+#             'learning_rate': SUPERSPIKE_PARAMS['r0'],
+#             'best_trial': best_trial,
+#             'feedback': 'symmetric',
+#             'best_acc': best_acc,
+#             'inp2hid': best_wts['inp2hid'],
+#             'hid2out': best_wts['hid2out']}
+#
+# filename = os.path.join(IMG_DIR, 'config.pkl')
+#
+# with open(os.path.join(IMG_DIR, "config.pkl"), 'wb') as fi:
+#     pkl.dump(pkl_dict, fi)
 
 print("Complete.")

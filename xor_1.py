@@ -246,6 +246,14 @@ TEST_LIF_PARAMS = {"C": 10.0,
                    "Ioffset": 0.0,
                    "TauRefrac": 5.0}
 
+###### Feedback implementation ##########
+continuous = genn_model.create_custom_weight_update_class(
+    "Continuous",
+    var_name_types=[("g", "scalar")],
+    synapse_dynamics_code="$(addToInSyn, $(g) * $(err_tilda_pre));")
+
+
+
 ########### Build model ################
 model = genn_model.GeNNModel("float", model_name)
 model.dT = 1.0 * TIME_FACTOR

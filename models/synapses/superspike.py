@@ -21,12 +21,12 @@ superspike_model = create_custom_weight_update_class(
     $(m) += g;
     if ((int)round($(t)) % (int)$(trial_end_t) == 0 && (int)round($(t)) != 0) {
         // calculate learning rate r
-        $(ExpRMS) = exp( - $(trial_length) / $(lambda));
-        $(upsilon) = fmax($(upsilon) * $(ExpRMS) , (($(m) * $(m)) / $(trial_length)));
-        // $(upsilon) = 1.0;
-        $(upsilon) = fmax($(upsilon), $(epsilon));
-        const scalar r = $(r0) / sqrt($(upsilon));
-        $(w) += r * $(m);
+        $(ExpRMS) = exp( - $(trial_length) / $(tau_rms));
+        const scalar grad= $(m)/$(trial_length);
+        $(upsilon) = fmax($(upsilon) * $(ExpRMS) , grad*grad);
+        //$(upsilon) = 1.0;
+        const scalar r = $(r0) / (sqrt($(upsilon))+$(epsilon));
+        $(w) += r * grad;
         $(w) = fmin($(wmax), fmax($(wmin), $(w)));
         $(m) = 0.0;
     }
@@ -38,13 +38,13 @@ superspike_model = create_custom_weight_update_class(
 
 SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "t_decay": 10,
-                     "tau_rms": 30,
+                     "tau_rms": 300,
                      "r0": 0.01,
                      "wmax": 10.0,
                      "wmin": -10.0,
                      "epsilon": 0.000000000000000000001}
 
-superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
+superspike_init = {"w": init_var("Uniform", {"min": -0.0001, "max": 0.0001}),
                    "e": 0.0,
                    "lambda": 0.0,
                    "upsilon": 0.0,

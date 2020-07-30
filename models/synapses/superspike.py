@@ -52,3 +52,10 @@ superspike_init = {"w": init_var("Uniform", {"min": -0.0001, "max": 0.0001}),
                    "trial_length": 0.0,
                    "ExpRMS": 0.0,
                    "trial_end_t": 0.0}
+
+feedback_wts_model = create_custom_weight_update_class(
+    "feedback",
+    var_name_types=[("g", "scalar")],
+    synapse_dynamics_code="$(addToInSyn, $(g) * $(err_tilda_pre));")
+
+feedback_wts_init = {"g": 1.0}

@@ -2,7 +2,7 @@
 Custom LIF neuron for SuperSpike
 """
 
-from pygenn.genn_model import create_custom_neuron_class, create_dpf_class, init_var
+from pygenn.genn_model import create_custom_neuron_class, create_dpf_class, init_var, create_custom_postsynaptic_class
 from numpy import exp, log, random
 
 # OUTPUT NEURON MODEL for precisely timed spikes #
@@ -106,7 +106,7 @@ hidden_model = create_custom_neuron_class(
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
     // error
-    // $(err_tilda) = $(err_output) * $(feedback_mult);
+    $(err_tilda) = $(ISynFeedback);
     """,
     reset_code="""
     $(RefracTime) = $(TauRefrac);
@@ -116,7 +116,8 @@ hidden_model = create_custom_neuron_class(
     derived_params=[
         ("ExpTC", create_dpf_class(lambda pars, dt: exp(-dt / pars[1]))()),
         ("Rmembrane", create_dpf_class(lambda pars, dt: pars[1] / pars[0])())
-    ]
+    ],
+    additional_input_vars=[("ISynFeedback", "scalar", 0.0)]
 )
 
 HIDDEN_PARAMS = {"C": 10.0,
@@ -213,5 +214,11 @@ output_init_classification = {"V": -60,
 #                           -- should only be considered for one time step at the end of the window of opportunity
 # window_of_opp is 0/1 to indicate if this timestep falls within the window of opportunity when the output neuron
 # is expected to react
+
+#### Feedback Postsynaptic Model #######
+
+feedback_postsyn_model = create_custom_postsynaptic_class(
+    "Feedback",
+    apply_input_code="$(ISynFeedback) += $(inSyn); $(inSyn) = 0;")
 
 

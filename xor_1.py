@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 from pygenn import genn_wrapper
 from pygenn import genn_model
 from models.neurons.lif_superspike import (output_model_classification, OUTPUT_PARAMS, output_init_classification,
-                                           hidden_model, HIDDEN_PARAMS, hidden_init)
-from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, superspike_init
+                                           hidden_model, HIDDEN_PARAMS, hidden_init,
+                                           feedback_postsyn_model)
+from models.synapses.superspike import (superspike_model, SUPERSPIKE_PARAMS, superspike_init,
+                                        feedback_wts_model, feedback_wts_init)
 import os
 import random
 import pickle as pkl
@@ -32,8 +34,8 @@ def create_poisson_spikes(interval, freq, spike_dt, time_factor):
 wmax = SUPERSPIKE_PARAMS['wmax']
 lr = str(SUPERSPIKE_PARAMS["r0"])[2:]
 model_name = lr + "_" + str(int(wmax))
-IMG_DIR = "/data/p286814/runs_3007/imgs_xor_" + model_name
-# IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
+# IMG_DIR = "/data/p286814/runs_3007/imgs_xor_" + model_name
+IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
 
 MODEL_BUILD_DIR = os.environ.get('TMPDIR')
 
@@ -45,7 +47,7 @@ WAIT_TIMESTEPS = 15
 ITI_RANGE = np.arange(50, 60)
 TEST_ITI = 55
 
-TRIALS = 20
+TRIALS = 100
 NUM_HIDDEN = 100
 WAIT_FREQ = 4  # Hz
 STIM_FREQ = 100  # Hz
@@ -246,14 +248,6 @@ TEST_LIF_PARAMS = {"C": 10.0,
                    "Ioffset": 0.0,
                    "TauRefrac": 5.0}
 
-###### Feedback implementation ##########
-continuous = genn_model.create_custom_weight_update_class(
-    "Continuous",
-    var_name_types=[("g", "scalar")],
-    synapse_dynamics_code="$(addToInSyn, $(g) * $(err_tilda_pre));")
-
-
-
 ########### Build model ################
 model = genn_model.GeNNModel("float", model_name)
 model.dT = 1.0 * TIME_FACTOR
@@ -275,11 +269,16 @@ hid2out = model.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrap
                                        superspike_model, SUPERSPIKE_PARAMS, superspike_init, {}, {},
                                        "ExpCurr", {"tau": 5.0}, {})
 
-model.build(path_to_model=MODEL_BUILD_DIR)
-model.load(path_to_model=MODEL_BUILD_DIR + "/")
+out2hid = model.add_synapse_population("out2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+                                       out, hid,
+                                       feedback_wts_model, {}, feedback_wts_init, {}, {},
+                                       feedback_postsyn_model, {}, {})
 
-# model.build()
-# model.load()
+# model.build(path_to_model=MODEL_BUILD_DIR)
+# model.load(path_to_model=MODEL_BUILD_DIR + "/")
+
+model.build()
+model.load()
 
 # print("Built main model")
 
@@ -303,9 +302,11 @@ hid_z = hid.vars['z'].view
 hid_z_tilda = hid.vars['z_tilda'].view
 hid_voltage = hid.vars['V'].view
 
+out2hid_wts = out2hid.vars['g'].view
+
 # Data structures for recording weights at the end of every trial
-# wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * NUM_HIDDEN)])
-# wts_hid2out = np.array([np.empty(0) for _ in range(NUM_HIDDEN * 2)])
+wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * NUM_HIDDEN)])
+wts_hid2out = np.array([np.empty(0) for _ in range(NUM_HIDDEN * 2)])
 
 time_elapsed = 0
 
@@ -320,11 +321,11 @@ best_err = np.inf
 best_acc = 0
 best_trial = 0
 
-plot_interval = 1000
+plot_interval = 1
 
 for trial in range(TRIALS):
 
-    if trial % 100 == 0:
+    if trial % 1 == 0:
         print("Trial: " + str(trial))
 
     # Important to record for this trial
@@ -339,7 +340,9 @@ for trial in range(TRIALS):
     # Symmetric feedback
     model.pull_var_from_device("hid2out", "w")
     h2o_weights = hid2out.get_var_values("w")
-    feedback_wts = np.reshape(h2o_weights, newshape=(NUM_HIDDEN, 2))
+    # feedback_wts = np.reshape(h2o_weights, newshape=(NUM_HIDDEN, 2))
+    out2hid_wts[:] = h2o_weights
+    model.push_var_to_device("out2hid", "g")
 
     # Reinitialization or providing correct values for diff vars at the start of the next trial
     out_voltage[:] = OUTPUT_PARAMS["Vrest"]
@@ -403,6 +406,8 @@ for trial in range(TRIALS):
         hid_spike_ids = np.empty(0)
         hid_spike_times = np.empty(0)
 
+        hid_err_tilda_arr = [np.empty(0) for _ in range(NUM_HIDDEN)]
+
     produced_spikes = []
     err_sum = 0
 
@@ -410,11 +415,11 @@ for trial in range(TRIALS):
 
     for t in range(steps):
 
-        model.pull_var_from_device("out", "err_tilda")
-        err_output = out.vars["err_tilda"].view[:]
-        err_hidden = np.sum(np.multiply(feedback_wts, err_output), axis=1)
-        hid_err_tilda[:] = err_hidden
-        model.push_var_to_device('hid', 'err_tilda')
+        # model.pull_var_from_device("out", "err_tilda")
+        # err_output = out.vars["err_tilda"].view[:]
+        # err_hidden = np.sum(np.multiply(feedback_wts, err_output), axis=1)
+        # hid_err_tilda[:] = err_hidden
+        # model.push_var_to_device('hid', 'err_tilda')
 
         if t == ((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS) / TIME_FACTOR):
             out_window_of_opp[:] = 0.0
@@ -455,152 +460,157 @@ for trial in range(TRIALS):
             out0_err = np.hstack((out0_err, out.vars["err_tilda"].view[0]))
             out1_err = np.hstack((out1_err, out.vars["err_tilda"].view[1]))
 
+            model.pull_var_from_device("hid", "err_tilda")
+            hid_err_tilda_new = hid_err_tilda[:]
+            for i in range(NUM_HIDDEN):
+                hid_err_tilda_arr[i] = np.hstack((hid_err_tilda_arr[i], hid_err_tilda_new[i]))
+
     time_elapsed += total_time
 
     # Record the weights at the end of the trial
-    # model.pull_var_from_device("inp2hid", "w")
-    # weights = inp2hid.get_var_values("w")
-    # weights = np.reshape(weights, (weights.shape[0], 1))
-    # wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
+    model.pull_var_from_device("inp2hid", "w")
+    weights = inp2hid.get_var_values("w")
+    weights = np.reshape(weights, (weights.shape[0], 1))
+    wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
+
+    model.pull_var_from_device("hid2out", "w")
+    h2o_weights = hid2out.get_var_values("w")
+    weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
+    wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
+
+    # # ############ TESTING ###########
     #
-    # model.pull_var_from_device("hid2out", "w")
-    # h2o_weights = hid2out.get_var_values("w")
-    # weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
-    # wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
-
-    # ############ TESTING ###########
-
-    if err_sum <= best_err:
-
-        print("Testing")
-        print("For trial: " + str(trial))
-
-        best_err = err_sum
-
-        model.pull_var_from_device("inp2hid", "w")
-        i2h_weights = inp2hid.get_var_values("w")
-        model.pull_var_from_device("hid2out", "w")
-        h2o_weights = hid2out.get_var_values("w")
-
-        test_network = genn_model.GeNNModel("float", "test_network" + model_name)
-        test_network.dT = 1.0 * TIME_FACTOR
-
-        test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
-                                                      test_ssa_input_init)
-        test_inp.set_extra_global_param("spikeTimes", test_spikeTimes)
-
-        test_hid = test_network.add_neuron_population("hid", NUM_HIDDEN, "LIF", TEST_LIF_PARAMS, test_lif_init)
-
-        test_out = test_network.add_neuron_population("out", 2, "LIF", TEST_LIF_PARAMS,
-                                                      test_lif_init)
-
-        test_inp2hid = test_network.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
-                                                           test_inp, test_hid,
-                                                           "StaticPulse", {}, {"g": i2h_weights.flatten()}, {}, {},
-                                                           "ExpCurr", {"tau": 5.0}, {})
-
-        test_hid2out = test_network.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
-                                                           test_hid, test_out,
-                                                           "StaticPulse", {}, {"g": h2o_weights.flatten()}, {}, {},
-                                                           "ExpCurr", {"tau": 5.0}, {})
-
-        test_network.build(path_to_model=MODEL_BUILD_DIR)
-        test_network.load(path_to_model=MODEL_BUILD_DIR + "/")
-
-        # test_network.build()
-        # test_network.load()
-
-        # print("Finished building test network.")
-
-        num_correct = 0
-
-        # test_time_elapsed = 0
-
-        for sample_idx in range(len(SAMPLES)):
-
-            # test_inp_spike_ids = np.empty(0)
-            # test_inp_spike_times = np.empty(0)
-            #
-            # test_hid_spike_ids = np.empty(0)
-            # test_hid_spike_times = np.empty(0)
-            #
-            # test_t_start = test_time_elapsed
-
-            test_target = SAMPLES[sample_idx][-1]
-            test_non_target = 1 - test_target
-
-            test_target_spikes = []
-            test_non_target_spikes = []
-
-            test_steps = int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + TEST_ITI) / TIME_FACTOR)
-
-            for t in range(test_steps):
-
-                test_network.step_time()
-
-                # test_network.pull_current_spikes_from_device("inp")
-                # times = np.ones_like(test_inp.current_spikes) * test_network.t
-                # test_inp_spike_ids = np.hstack((test_inp_spike_ids, test_inp.current_spikes))
-                # test_inp_spike_times = np.hstack((test_inp_spike_times, times))
-                #
-                # test_network.pull_current_spikes_from_device("hid")
-                # times = np.ones_like(test_hid.current_spikes) * test_network.t
-                # test_hid_spike_ids = np.hstack((test_hid_spike_ids, test_hid.current_spikes))
-                # test_hid_spike_times = np.hstack((test_hid_spike_times, times))
-
-                if t < int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS) / TIME_FACTOR):
-                    test_network.pull_current_spikes_from_device("out")
-                    if test_target in test_out.current_spikes:
-                        test_target_spikes.append(test_network.t)
-                    if test_non_target in test_out.current_spikes:
-                        test_non_target_spikes.append(test_network.t)
-
-            if len(test_target_spikes) != 0 and len(test_non_target_spikes) == 0:
-                num_correct += 1
-
-            # test_time_elapsed += STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + TEST_ITI
-
-            # # PLOTTING FOR TESITNG
-            #
-            # num_plots = 2
-            #
-            # fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
-            #
-            # axes[0].scatter(test_inp_spike_times, test_inp_spike_ids)
-            # axes[0].set_ylim(-1, N_INPUT + 1)
-            # axes[0].set_title("Input layer spikes")
-            # axes[0].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
-            # axes[0].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
-            # # axes[0].axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
-            # axes[0].axvline(x=test_t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
-            #
-            # axes[1].scatter(test_hid_spike_times, test_hid_spike_ids)
-            # axes[1].set_ylim(-1, NUM_HIDDEN + 1)
-            # axes[1].set_title("Hidden layer spikes")
-            #
-            # c = 'royalblue' if test_target == 0 else 'magenta'
-            #
-            # for i in range(num_plots):
-            #     axes[i].axvspan(test_t_start, test_t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
-            #
-            # axes[-1].set_xlabel("Time [ms] x 0.1")
-            # # axes.set_xlabel("Time [ms]")
-            # x_ticks_plot = list(range(test_t_start, test_time_elapsed, int(ceil(5 * TIME_FACTOR))))
-            # axes[-1].set_xticks(x_ticks_plot)
-            #
-            # save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + "_test" + str(sample_idx) + ".png")
-            # plt.savefig(save_filename)
-            # plt.close()
-
-        accuracy = num_correct / 4
-
-        if accuracy > best_acc:
-            test_network.pull_var_from_device("inp2hid", "g")
-            best_wts['inp2hid'] = test_inp2hid.get_var_values("g")
-            test_network.pull_var_from_device("hid2out", "g")
-            best_wts['hid2out'] = test_hid2out.get_var_values("g")
-            best_acc = accuracy
-            best_trial = trial
+    # if err_sum <= best_err:
+    #
+    #     print("Testing")
+    #     print("For trial: " + str(trial))
+    #
+    #     best_err = err_sum
+    #
+    #     model.pull_var_from_device("inp2hid", "w")
+    #     i2h_weights = inp2hid.get_var_values("w")
+    #     model.pull_var_from_device("hid2out", "w")
+    #     h2o_weights = hid2out.get_var_values("w")
+    #
+    #     test_network = genn_model.GeNNModel("float", "test_network" + model_name)
+    #     test_network.dT = 1.0 * TIME_FACTOR
+    #
+    #     test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
+    #                                                   test_ssa_input_init)
+    #     test_inp.set_extra_global_param("spikeTimes", test_spikeTimes)
+    #
+    #     test_hid = test_network.add_neuron_population("hid", NUM_HIDDEN, "LIF", TEST_LIF_PARAMS, test_lif_init)
+    #
+    #     test_out = test_network.add_neuron_population("out", 2, "LIF", TEST_LIF_PARAMS,
+    #                                                   test_lif_init)
+    #
+    #     test_inp2hid = test_network.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+    #                                                        test_inp, test_hid,
+    #                                                        "StaticPulse", {}, {"g": i2h_weights.flatten()}, {}, {},
+    #                                                        "ExpCurr", {"tau": 5.0}, {})
+    #
+    #     test_hid2out = test_network.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+    #                                                        test_hid, test_out,
+    #                                                        "StaticPulse", {}, {"g": h2o_weights.flatten()}, {}, {},
+    #                                                        "ExpCurr", {"tau": 5.0}, {})
+    #
+    #     test_network.build(path_to_model=MODEL_BUILD_DIR)
+    #     test_network.load(path_to_model=MODEL_BUILD_DIR + "/")
+    #
+    #     # test_network.build()
+    #     # test_network.load()
+    #
+    #     # print("Finished building test network.")
+    #
+    #     num_correct = 0
+    #
+    #     # test_time_elapsed = 0
+    #
+    #     for sample_idx in range(len(SAMPLES)):
+    #
+    #         # test_inp_spike_ids = np.empty(0)
+    #         # test_inp_spike_times = np.empty(0)
+    #         #
+    #         # test_hid_spike_ids = np.empty(0)
+    #         # test_hid_spike_times = np.empty(0)
+    #         #
+    #         # test_t_start = test_time_elapsed
+    #
+    #         test_target = SAMPLES[sample_idx][-1]
+    #         test_non_target = 1 - test_target
+    #
+    #         test_target_spikes = []
+    #         test_non_target_spikes = []
+    #
+    #         test_steps = int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + TEST_ITI) / TIME_FACTOR)
+    #
+    #         for t in range(test_steps):
+    #
+    #             test_network.step_time()
+    #
+    #             # test_network.pull_current_spikes_from_device("inp")
+    #             # times = np.ones_like(test_inp.current_spikes) * test_network.t
+    #             # test_inp_spike_ids = np.hstack((test_inp_spike_ids, test_inp.current_spikes))
+    #             # test_inp_spike_times = np.hstack((test_inp_spike_times, times))
+    #             #
+    #             # test_network.pull_current_spikes_from_device("hid")
+    #             # times = np.ones_like(test_hid.current_spikes) * test_network.t
+    #             # test_hid_spike_ids = np.hstack((test_hid_spike_ids, test_hid.current_spikes))
+    #             # test_hid_spike_times = np.hstack((test_hid_spike_times, times))
+    #
+    #             if t < int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS) / TIME_FACTOR):
+    #                 test_network.pull_current_spikes_from_device("out")
+    #                 if test_target in test_out.current_spikes:
+    #                     test_target_spikes.append(test_network.t)
+    #                 if test_non_target in test_out.current_spikes:
+    #                     test_non_target_spikes.append(test_network.t)
+    #
+    #         if len(test_target_spikes) != 0 and len(test_non_target_spikes) == 0:
+    #             num_correct += 1
+    #
+    #         # test_time_elapsed += STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + TEST_ITI
+    #
+    #         # # PLOTTING FOR TESITNG
+    #         #
+    #         # num_plots = 2
+    #         #
+    #         # fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
+    #         #
+    #         # axes[0].scatter(test_inp_spike_times, test_inp_spike_ids)
+    #         # axes[0].set_ylim(-1, N_INPUT + 1)
+    #         # axes[0].set_title("Input layer spikes")
+    #         # axes[0].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
+    #         # axes[0].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
+    #         # # axes[0].axvline(x=t_start + STIMULUS_TIMESTEPS, color="green", linestyle="--")
+    #         # axes[0].axvline(x=test_t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
+    #         #
+    #         # axes[1].scatter(test_hid_spike_times, test_hid_spike_ids)
+    #         # axes[1].set_ylim(-1, NUM_HIDDEN + 1)
+    #         # axes[1].set_title("Hidden layer spikes")
+    #         #
+    #         # c = 'royalblue' if test_target == 0 else 'magenta'
+    #         #
+    #         # for i in range(num_plots):
+    #         #     axes[i].axvspan(test_t_start, test_t_start + STIMULUS_TIMESTEPS, facecolor=c, alpha=0.3)
+    #         #
+    #         # axes[-1].set_xlabel("Time [ms] x 0.1")
+    #         # # axes.set_xlabel("Time [ms]")
+    #         # x_ticks_plot = list(range(test_t_start, test_time_elapsed, int(ceil(5 * TIME_FACTOR))))
+    #         # axes[-1].set_xticks(x_ticks_plot)
+    #         #
+    #         # save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + "_test" + str(sample_idx) + ".png")
+    #         # plt.savefig(save_filename)
+    #         # plt.close()
+    #
+    #     accuracy = num_correct / 4
+    #
+    #     if accuracy > best_acc:
+    #         test_network.pull_var_from_device("inp2hid", "g")
+    #         best_wts['inp2hid'] = test_inp2hid.get_var_values("g")
+    #         test_network.pull_var_from_device("hid2out", "g")
+    #         best_wts['hid2out'] = test_hid2out.get_var_values("g")
+    #         best_acc = accuracy
+    #         best_trial = trial
 
     ########## Make plots similar to Fig. 5b from the paper #############
 
@@ -614,7 +624,7 @@ for trial in range(TRIALS):
 
         timesteps_plot = np.linspace(t_start, time_elapsed, num=steps)
 
-        num_plots = 4
+        num_plots = 5
 
         fig, axes = plt.subplots(num_plots, sharex=True, figsize=(15, 8))
 
@@ -642,6 +652,10 @@ for trial in range(TRIALS):
         axes[3].set_ylim(-1, NUM_HIDDEN + 1)
         axes[3].set_title("Hidden layer spikes")
 
+        for i in range(NUM_HIDDEN):
+            axes[4].plot(timesteps_plot, hid_err_tilda_arr[i])
+        axes[4].set_title("Hidden err_tilda")
+
         c = 'royalblue' if target == 0 else 'magenta'
 
         for i in range(num_plots):
@@ -657,24 +671,24 @@ for trial in range(TRIALS):
         plt.close()
 
 # Plot weights as a pixel plot with a colorbar
-# print("Creating wts_inp2hid")
-# plt.figure(figsize=(20, 50))
-# plt.imshow(wts_inp2hid, cmap='gray')
-# plt.colorbar()
-# plt.yticks(list(range(wts_inp2hid.shape[0])))
-# plt.xticks(list(range(wts_inp2hid.shape[1])))
-# save_filename = os.path.join(IMG_DIR, "wts_inp2hid.png")
-# plt.savefig(save_filename)
-# plt.close()
-# print("Creating wts_hid2out")
-# plt.figure()
-# plt.imshow(wts_hid2out, cmap='gray')
-# plt.colorbar()
-# plt.yticks(list(range(wts_hid2out.shape[0])))
-# plt.xticks(list(range(wts_hid2out.shape[1])))
-# save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
-# plt.savefig(save_filename)
-# plt.close()
+print("Creating wts_inp2hid")
+plt.figure(figsize=(20, 50))
+plt.imshow(wts_inp2hid, cmap='gray')
+plt.colorbar()
+plt.yticks(list(range(wts_inp2hid.shape[0])))
+plt.xticks(list(range(wts_inp2hid.shape[1])))
+save_filename = os.path.join(IMG_DIR, "wts_inp2hid.png")
+plt.savefig(save_filename)
+plt.close()
+print("Creating wts_hid2out")
+plt.figure()
+plt.imshow(wts_hid2out, cmap='gray')
+plt.colorbar()
+plt.yticks(list(range(wts_hid2out.shape[0])))
+plt.xticks(list(range(wts_hid2out.shape[1])))
+save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
+plt.savefig(save_filename)
+plt.close()
 
 pkl_dict = {'wmax': SUPERSPIKE_PARAMS['wmax'],
             'wmin': SUPERSPIKE_PARAMS['wmin'],

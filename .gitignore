@@ -13,3 +13,5 @@ test.py
 *.pkl
 prep.py
 *.out
+xor_stdp.py
+Untitled.ipynb

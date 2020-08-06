@@ -1,5 +1,8 @@
 from pygenn.genn_model import create_custom_weight_update_class, create_dpf_class, init_var
 
+lr = 0.01
+wmax = 10
+
 superspike_model = create_custom_weight_update_class(
     "superspike_model",
     param_names=["t_rise", "t_decay", "tau_rms", "r0", "wmax", "wmin", "epsilon"],
@@ -34,20 +37,20 @@ superspike_model = create_custom_weight_update_class(
 
 SUPERSPIKE_PARAMS = {"t_rise": 5,
                      "t_decay": 10,
-                     "tau_rms": 300,
-                     "r0": 0.01,
-                     "wmax": 10.0,
-                     "wmin": -10.0,
+                     "tau_rms": 30000,
+                     "r0": lr,
+                     "wmax": wmax,
+                     "wmin": -wmax,
                      "epsilon": 0.000000000000000000001}
 
-superspike_init = {"w": init_var("Uniform", {"min": -0.0001, "max": 0.0001}),
+superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                    "e": 0.0,
                    "lambda": 0.0,
                    "upsilon": 0.0,
                    "m": 0.0,
                    "trial_length": 0.0,
                    "ExpRMS": 0.0,
-                   "trial_end_t": 0.0}
+                   "trial_end_t": 500.0}
 
 feedback_wts_model = create_custom_weight_update_class(
     "feedback",
@@ -96,21 +99,23 @@ superspike_reg_model = create_custom_weight_update_class(
 
 SUPERSPIKE_REG_PARAMS = {"t_rise": 5,
                          "t_decay": 10,
-                         "tau_rms": 300,
-                         "r0": 0.01,
-                         "wmax": 10.0,
-                         "wmin": -10.0,
+                         "tau_rms": 30000,
+                         "r0": lr,
+                         "wmax": wmax,
+                         "wmin": -wmax,
                          "epsilon": 0.000000000000000000001,
                          "tau_het": 100,
                          "rho": 1.0,
                          "a": 4.0}
 
-superspike_reg_init = {"w": init_var("Uniform", {"min": -0.0001, "max": 0.0001}),
+superspike_reg_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                        "e": 0.0,
                        "lambda": 0.0,
                        "upsilon": 0.0,
                        "m": 0.0,
                        "trial_length": 0.0,
                        "ExpRMS": 0.0,
-                       "trial_end_t": 0.0,
+                       "trial_end_t": 500.0,
                        "z_fir_rate": 0.0}
+
+# if ((int)round($(t)) % (int)$(trial_end_t) == 0 && (int)round($(t)) != 0) {

@@ -12,7 +12,7 @@ output_model = create_custom_neuron_class(
                  "t_rise", "t_decay", "beta", "t_peak"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
-                    ("mismatch", "scalar")],
+                    ("mismatch", "scalar"), ("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -29,7 +29,11 @@ output_model = create_custom_neuron_class(
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
     $(sigma_prime) = 1.0 / (one_plus_hi * one_plus_hi);
     // error
-    const scalar S_pred = $(spike_times)[(int)round($(t) / DT)];
+    scalar S_pred = 0.0;
+    if ($(startSpike) != $(endSpike) && $(t) >= $(spike_times)[$(startSpike)]) {
+        $(startSpike)++;
+        S_pred = 1.0;
+    }
     const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
     $(mismatch) = S_pred - S_real;
     $(err_rise) = ($(err_rise) * $(t_rise_mult)) + $(mismatch);
@@ -75,6 +79,7 @@ output_init = {"V": -60,
                "err_decay": 0.0,
                "err_tilda": 0.0,
                "mismatch": 0.0}
+# startSpike and endSpike to be specified in simulation script
 
 # HIDDEN NEURON MODEL #
 
@@ -83,7 +88,7 @@ hidden_model = create_custom_neuron_class(
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac", "beta", "t_rise", "t_decay"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_tilda", "scalar"), ("feedback_mult", "scalar"), ("z", "scalar"),
-                    ("z_tilda", "scalar"), ("err_output", "scalar")],
+                    ("z_tilda", "scalar"), ("err_output", "scalar"), ("did_i_spike", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -92,9 +97,11 @@ hidden_model = create_custom_neuron_class(
     if ($(RefracTime) <= 0.0) {
         scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
         $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+        $(did_i_spike) = 0.0;
     }
     else {
         $(RefracTime) -= DT;
+        $(did_i_spike) = 0.0;
     }
     // filtered presynaptic trace
     $(z) += (- $(z) / $(t_rise)) * DT;
@@ -111,6 +118,7 @@ hidden_model = create_custom_neuron_class(
     reset_code="""
     $(RefracTime) = $(TauRefrac);
     $(z) += 1.0;
+    $(did_i_spike) = 1.0;
     """,
     threshold_condition_code="$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
     derived_params=[
@@ -137,7 +145,8 @@ hidden_init = {"V": -60,
                "feedback_mult": init_var("Normal", {"mean": 0.0, "sd": 1.0}),
                "z": 0.0,
                "z_tilda": 0.0,
-               "err_output": 0.0}
+               "err_output": 0.0,
+               "did_i_spike": 0.0}
 
 # OUTPUT NEURON MODEL for classifying patterns #
 
@@ -148,22 +157,18 @@ output_model_classification = create_custom_neuron_class(
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
                     ("mismatch", "scalar"),
-                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar"),
-                    ("did_i_spike", "scalar")],
+                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
         $(V) = $(Vrest);
-        $(did_i_spike) = 1.0;
     }
     if ($(RefracTime) <= 0.0) {
         scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
         $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
-        $(did_i_spike) = 0.0;
     }
     else {
         $(RefracTime) -= DT;
-        $(did_i_spike) = 0.0;
     }
     // filtered partial derivative
     const scalar one_plus_hi = 1.0 + fabs($(beta) * ($(V) - $(Vthresh)));
@@ -211,8 +216,7 @@ output_init_classification = {"V": -60,
                               "mismatch": 0.0,
                               "S_pred": 0.0,
                               "S_miss": 0.0,
-                              "window_of_opp": 0.0,
-                              "did_i_spike": 0.0}
+                              "window_of_opp": 0.0}
 
 # S_pred is 0/1 indicating if this is the target neuron -- should be considered only during window of opportunity
 # S_miss is 0/1 to indicate if this neuron should have fired during the window of opportunity and did not

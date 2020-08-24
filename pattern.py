@@ -7,12 +7,19 @@ from models.neurons.lif_superspike import (output_model, OUTPUT_PARAMS, output_i
                                            hidden_model, HIDDEN_PARAMS, hidden_init,
                                            feedback_postsyn_model)
 from models.synapses.superspike import (superspike_model, SUPERSPIKE_PARAMS, superspike_init,
-                                        feedback_wts_model, feedback_wts_init,
-                                        superspike_reg_model, SUPERSPIKE_REG_PARAMS, superspike_reg_init)
+                                        feedback_wts_model, feedback_wts_init)
 import os
 import random
 import pickle as pkl
 from math import ceil
+
+
+def get_mean_square_error(scale_tr_err_flt, avgsqrerr, get_time, tau_avg_err):
+    temp = scale_tr_err_flt * np.mean(avgsqrerr)
+    time_in_secs = get_time / 1000
+    div = 1.0 - np.exp(-time_in_secs / tau_avg_err) + 1e-9
+    error = temp / div
+    return error
 
 
 def create_poisson_spikes(interval, freq, spike_dt, time_factor):
@@ -55,18 +62,21 @@ print("Processed " + str(c) + " rows.")
 # plt.close()
 
 # PARAMETERS
-TIMESTEPS = 1900  # ms
-N_INPUT = max(neurons)
+update_time = 10 * 1000
+TIMESTEPS = 1890  # ms
+N_INPUT = 200
 N_OUTPUT = N_INPUT
 TRIALS = 1501
 INPUT_FREQ = 5  # Hz
 TIME_FACTOR = 0.1
 N_HIDDEN = 256
 spike_dt = 0.001  # 1 ms
+SUPERSPIKE_PARAMS['r0'] = 0.005
+SUPERSPIKE_PARAMS['update_t'] = update_time
 
-model_name_build = "pattern_staggered"
+model_name_build = "pattern_005_256_c"
 # IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
-IMG_DIR = "/data/p286814/imgs_pattern_staggered"
+IMG_DIR = os.path.join("/data/p286814/", model_name_build)
 
 MODEL_BUILD_DIR = os.environ.get('TMPDIR') + os.path.sep
 # MODEL_BUILD_DIR = "./"
@@ -206,15 +216,19 @@ hid_err_tilda = hid.vars['err_tilda'].view
 out_err_tilda = out.vars['err_tilda'].view
 out2hid_wts = out2hid.vars['g'].view
 
-inp2hid.vars["trial_length"].view[:] = float(TIMESTEPS)
-model.push_var_to_device("inp2hid", "trial_length")
-hid2out.vars["trial_length"].view[:] = float(TIMESTEPS)
-model.push_var_to_device("hid2out", "trial_length")
-
 wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * N_HIDDEN)])
 wts_hid2out = np.array([np.empty(0) for _ in range(N_HIDDEN * N_OUTPUT)])
 
-plot_interval = 10
+plot_interval = 50
+
+a = 10.0
+b = 5.0
+tau_avg_err = 10.0
+scale_tr_err_flt = 1.0 / ((((a * b) / (a - b)) ** 2) * (a / 2 + b / 2 - 2 * (a * b) / (a + b))) / tau_avg_err
+mul_avgsqrerr = np.exp(-TIME_FACTOR / tau_avg_err)
+
+avgsqrerr = np.zeros(shape=N_OUTPUT)
+record_avgsqerr = np.empty(0)
 
 for trial_idx in range(TRIALS):
 
@@ -272,6 +286,20 @@ for trial_idx in range(TRIALS):
 
     for t in range(steps_in_trial):
         model.step_time()
+
+        # Calculate learning curve
+        model.pull_var_from_device("out", "err_tilda")
+        temp = out_err_tilda[:]
+        temp = np.power(temp, 2)
+        temp = np.multiply(temp, TIME_FACTOR)
+        avgsqrerr = np.multiply(avgsqrerr, mul_avgsqrerr)
+        avgsqrerr = np.add(avgsqrerr, temp)
+
+        if model.t % update_time == 0 and model.t != 0:
+            error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, time_elapsed, tau_avg_err)
+            print("Error: " + str(error))
+            record_avgsqerr = np.hstack((record_avgsqerr, error))
+            avgsqrerr = np.zeros(shape=N_OUTPUT)
 
         if trial_idx % plot_interval == 0:
 
@@ -347,3 +375,18 @@ plt.xticks(list(range(wts_hid2out.shape[1])))
 save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
 plt.savefig(save_filename)
 plt.close()
+
+print("Creating plot for avgsqerr")
+fig, ax = plt.subplots()
+ax.plot(list(range(len(record_avgsqerr))), record_avgsqerr)
+ax.axhline(y=0.0)
+save_filename = os.path.join(IMG_DIR, "avgsqerr.png")
+plt.savefig(save_filename)
+plt.close()
+
+with open(os.path.join(IMG_DIR, "record_avgsqerr.pkl"), "wb") as f:
+    pkl.dump(record_avgsqerr, f)
+
+print("Dumped in pickle file.")
+print("Complete.")
+

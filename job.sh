@@ -1,8 +1,4 @@
 #!/bin/bash
-lr='01'
-wmax='1'
-tussen='_'
-jobname=$lr$tussen$wmax
 #SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

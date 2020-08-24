@@ -15,3 +15,11 @@ prep.py
 *.out
 xor_stdp.py
 Untitled.ipynb
+test_config.py
+model_time.py
+model_time_1.py
+mnist_testing.ipynb
+mnist_testing.py
+make_spikes.py
+distance_test.py
+thesis_things

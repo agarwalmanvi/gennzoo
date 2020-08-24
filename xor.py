@@ -21,11 +21,12 @@ if len(sys.argv) > 1:
 	experiment_type = str(config["Superspike"]["ExperimentType"])
 	learning_rate = float(config["Superspike"]["LearningRate"])
 	TRIALS = int(config["Superspike"]["Trials"])
+	SUPERSPIKE_PARAMS["r0"] = learning_rate
 
 else:
 	print("Using default arguments")
 	experiment_type = "default"
-	learning_rate = 0.01
+	learning_rate = SUPERSPIKE_PARAMS["r0"]
 	TRIALS = 1001
 
 model_name = experiment_type + "_" + str(learning_rate)
@@ -52,7 +53,6 @@ N_INPUT = sum([i[1] for i in INPUT_NUM])
 SPIKE_DT = 0.001  # 1 ms
 
 SUPERSPIKE_PARAMS["update_t"] = UPDATE_TIME
-SUPERSPIKE_PARAMS["r0"] = learning_rate
 
 ####### Create poisson spike trains for all input neurons and all trials ###########
 
@@ -347,11 +347,11 @@ record_avgsqerr = np.empty(0)
 avgsqrerr = np.zeros(shape=2)
 
 time_elapsed = 0  # ms
-plot_interval = 5
+plot_interval = 1
 
 for trial in range(TRIALS):
 
-	if trial % 100 == 0:
+	if trial % 1 == 0:
 		print("\n")
 		print("Trial: " + str(trial))
 
@@ -448,13 +448,14 @@ for trial in range(TRIALS):
 		avgsqrerr = np.multiply(avgsqrerr, mul_avgsqrerr)
 		avgsqrerr = np.add(avgsqrerr, temp)
 
-		if model.t + 1 % UPDATE_TIME == 0 and model.t == 0:
+		# Record the previous weights in case you can need to test
+		if np.round(model.t + TIME_FACTOR, decimals=1) % UPDATE_TIME == 0:
 			model.pull_var_from_device("inp2hid", "w")
 			prev_inp2hid = inp2hid.get_var_values("w")
 			model.pull_var_from_device("hid2out", "w")
 			prev_hid2out = hid2out.get_var_values("w")
 
-		# when the model has updated the weights
+		# At the time step when the model has updated the weights
 		if model.t % UPDATE_TIME == 0 and model.t != 0:
 			# We calculate the total average square error
 			error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, time_elapsed, tau_avg_err)
@@ -472,78 +473,76 @@ for trial in range(TRIALS):
 			h2o_weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
 			wts_hid2out = np.concatenate((wts_hid2out, h2o_weights), axis=1)
 
-		# We also test the network configuration
-		if error <= best_err:
+			# We also test the network configuration
+			if error <= best_err:
 
-			print("Testing in trial: " + str(trial))
+				print("Testing in trial: " + str(trial))
 
-			best_err = error
+				best_err = error
 
-			test_network = genn_model.GeNNModel(precision="float", model_name=model_name+"_test",
-												time_precision="double")
-			test_network.dT = 1.0 * TIME_FACTOR
+				test_network = genn_model.GeNNModel(precision="float", model_name=model_name+"_test",
+													time_precision="double")
+				test_network.dT = 1.0 * TIME_FACTOR
 
-			test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
-														  test_ssa_input_init)
-			test_inp.set_extra_global_param("spikeTimes", test_spikeTimes)
+				test_inp = test_network.add_neuron_population("inp", N_INPUT, "SpikeSourceArray", {},
+															  test_ssa_input_init)
+				test_inp.set_extra_global_param("spikeTimes", test_spikeTimes)
 
-			test_hid = test_network.add_neuron_population("hid", N_HIDDEN, "LIF", TEST_LIF_PARAMS, test_lif_init)
+				test_hid = test_network.add_neuron_population("hid", N_HIDDEN, "LIF", TEST_LIF_PARAMS, test_lif_init)
 
-			test_out = test_network.add_neuron_population("out", N_OUTPUT, "LIF", TEST_LIF_PARAMS,
-														  test_lif_init)
+				test_out = test_network.add_neuron_population("out", N_OUTPUT, "LIF", TEST_LIF_PARAMS,
+															  test_lif_init)
 
-			test_inp2hid = test_network.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG",
-															   genn_wrapper.NO_DELAY,
-															   test_inp, test_hid,
-															   "StaticPulse", {}, {"g": prev_inp2hid.flatten()}, {},
-															   {},
-															   "ExpCurr", {"tau": 5.0}, {})
+				test_inp2hid = test_network.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG",
+																   genn_wrapper.NO_DELAY,
+																   test_inp, test_hid,
+																   "StaticPulse", {}, {"g": prev_inp2hid.flatten()}, {},
+																   {},
+																   "ExpCurr", {"tau": 5.0}, {})
 
-			test_hid2out = test_network.add_synapse_population("hid2out", "DENSE_INDIVIDUALG",
-															   genn_wrapper.NO_DELAY,
-															   test_hid, test_out,
-															   "StaticPulse", {}, {"g": prev_hid2out.flatten()}, {},
-															   {},
-															   "ExpCurr", {"tau": 5.0}, {})
+				test_hid2out = test_network.add_synapse_population("hid2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
+																   test_hid, test_out,
+																   "StaticPulse", {}, {"g": prev_hid2out.flatten()}, {}, {},
+																   "ExpCurr", {"tau": 5.0}, {})
 
-			test_network.build(path_to_model=MODEL_BUILD_DIR)
-			test_network.load(path_to_model=MODEL_BUILD_DIR)
+				test_network.build(path_to_model=MODEL_BUILD_DIR)
+				test_network.load(path_to_model=MODEL_BUILD_DIR)
 
-			num_correct = 0
+				num_correct = 0
 
-			for sample_idx in range(len(SAMPLES)):
+				for sample_idx in range(len(SAMPLES)):
 
-				test_target = SAMPLES[sample_idx][-1]
-				test_non_target = 1 - test_target
+					test_target = SAMPLES[sample_idx][-1]
+					test_non_target = 1 - test_target
 
-				test_target_spikes = []
-				test_non_target_spikes = []
+					test_target_spikes = []
+					test_non_target_spikes = []
 
-				test_steps = int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + TEST_ITI) / TIME_FACTOR)
+					test_steps = int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + TEST_ITI) / TIME_FACTOR)
 
-				for t in range(test_steps):
+					for test_t in range(test_steps):
 
-					test_network.step_time()
+						test_network.step_time()
 
-					if t < int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS) / TIME_FACTOR):
-						test_network.pull_current_spikes_from_device("out")
-						if test_target in test_out.current_spikes:
-							test_target_spikes.append(test_network.t)
-						if test_non_target in test_out.current_spikes:
-							test_non_target_spikes.append(test_network.t)
+						if test_t < int((STIMULUS_TIMESTEPS + WAIT_TIMESTEPS) / TIME_FACTOR):
+							test_network.pull_current_spikes_from_device("out")
+							if test_target in test_out.current_spikes:
+								test_target_spikes.append(test_network.t)
+							if test_non_target in test_out.current_spikes:
+								test_non_target_spikes.append(test_network.t)
 
-				if len(test_target_spikes) != 0 and len(test_non_target_spikes) == 0:
-					num_correct += 1
+					if len(test_target_spikes) != 0 and len(test_non_target_spikes) == 0:
+						num_correct += 1
 
-			accuracy = num_correct / 4
+				accuracy = num_correct / 4
 
-			if accuracy > best_acc:
-				test_network.pull_var_from_device("inp2hid", "g")
-				best_wts['inp2hid'] = test_inp2hid.get_var_values("g")
-				test_network.pull_var_from_device("hid2out", "g")
-				best_wts['hid2out'] = test_hid2out.get_var_values("g")
-				best_acc = accuracy
-				best_trial = trial
+				if accuracy > best_acc:
+					test_network.pull_var_from_device("inp2hid", "g")
+					best_wts['inp2hid'] = test_inp2hid.get_var_values("g")
+					test_network.pull_var_from_device("hid2out", "g")
+					best_wts['hid2out'] = test_hid2out.get_var_values("g")
+					best_acc = accuracy
+					best_trial = trial
 
 		if trial % plot_interval == 0:
 			model.pull_current_spikes_from_device("inp")
@@ -618,5 +617,3 @@ We can also add some code below to dump all the variables that we have been keep
 track of through the simulation, such as the weights or the best configuration after testing
 or the history of errors.
 """
-print(record_avgsqerr)
-print(wts_inp2hid)

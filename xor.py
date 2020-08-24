@@ -154,52 +154,52 @@ Just as we needed to fix the training spike trains for all neurons before
 starting the simulation, we also need to fix the testing spike trains
 for all neurons. 
 """
-# test_poisson_spikes = []
-#
-# for neuron_idx in range(N_INPUT):
-#
-#     time_elapsed = 0
-#     neuron_poisson_spikes = np.empty(0)
-#
-#     for sample_idx in range(len(SAMPLES)):
-#
-#         if neuron_idx < INPUT_NUM[0][1]:
-#
-#             spike_times = np.array(static_spikes_arr[neuron_idx])
-#             spike_times += time_elapsed
-#             neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#         elif INPUT_NUM[0][1] <= neuron_idx < INPUT_NUM[0][1] + INPUT_NUM[1][1]:
-#
-#             if SAMPLES[sample_idx][0] == 1:
-#                 spike_times = np.array(static_spikes_arr[neuron_idx])
-#                 spike_times += time_elapsed
-#                 neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#         else:
-#
-#             if SAMPLES[sample_idx][1] == 1:
-#                 spike_times = np.array(static_spikes_arr[neuron_idx])
-#                 spike_times += time_elapsed
-#                 neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#
-#         time_elapsed += STIMULUS_TIMESTEPS
-#         wait_plus_iti = WAIT_TIMESTEPS + TEST_ITI
-#
-#         spike_times = create_poisson_spikes(wait_plus_iti, WAIT_FREQ, SPIKE_DT, TIME_FACTOR)
-#         spike_times += time_elapsed
-#         neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
-#         time_elapsed += wait_plus_iti
-#
-#     test_poisson_spikes.append(neuron_poisson_spikes)
-#
-# test_spike_counts = [len(n) for n in test_poisson_spikes]
-# test_end_spike = np.cumsum(test_spike_counts)
-# test_start_spike = np.empty_like(test_end_spike)
-# test_start_spike[0] = 0
-# test_start_spike[1:] = test_end_spike[0:-1]
-#
-# test_spikeTimes = np.hstack(test_poisson_spikes).astype(float)
+test_poisson_spikes = []
+
+for neuron_idx in range(N_INPUT):
+
+    time_elapsed = 0
+    neuron_poisson_spikes = np.empty(0)
+
+    for sample_idx in range(len(SAMPLES)):
+
+        if neuron_idx < INPUT_NUM[0][1]:
+
+            spike_times = np.array(static_spikes_arr[neuron_idx])
+            spike_times += time_elapsed
+            neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+
+        elif INPUT_NUM[0][1] <= neuron_idx < INPUT_NUM[0][1] + INPUT_NUM[1][1]:
+
+            if SAMPLES[sample_idx][0] == 1:
+                spike_times = np.array(static_spikes_arr[neuron_idx])
+                spike_times += time_elapsed
+                neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+
+        else:
+
+            if SAMPLES[sample_idx][1] == 1:
+                spike_times = np.array(static_spikes_arr[neuron_idx])
+                spike_times += time_elapsed
+                neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+
+        time_elapsed += STIMULUS_TIMESTEPS
+        wait_plus_iti = WAIT_TIMESTEPS + TEST_ITI
+
+        spike_times = create_poisson_spikes(wait_plus_iti, WAIT_FREQ, SPIKE_DT, TIME_FACTOR)
+        spike_times += time_elapsed
+        neuron_poisson_spikes = np.hstack((neuron_poisson_spikes, spike_times))
+        time_elapsed += wait_plus_iti
+
+    test_poisson_spikes.append(neuron_poisson_spikes)
+
+test_spike_counts = [len(n) for n in test_poisson_spikes]
+test_end_spike = np.cumsum(test_spike_counts)
+test_start_spike = np.empty_like(test_end_spike)
+test_start_spike[0] = 0
+test_start_spike[1:] = test_end_spike[0:-1]
+
+test_spikeTimes = np.hstack(test_poisson_spikes).astype(float)
 
 """
 Below, we modified the in-built `SpikeSourceArray` model to include the `z` variable
@@ -238,19 +238,19 @@ ssa_input_init = {"startSpike": start_spike,
 We also define some initializations for the input population in the testing model
 """
 
-# test_ssa_input_init = {"startSpike": test_start_spike,
-#                        "endSpike": test_end_spike}
-#
-# test_lif_init = {"V": -60.0,
-#                  "RefracTime": 0.0}
-#
-# TEST_LIF_PARAMS = {"C": 10.0,
-#                    "TauM": 10.0,
-#                    "Vrest": -60.0,
-#                    "Vreset": -60.0,
-#                    "Vthresh": -50.0,
-#                    "Ioffset": 0.0,
-#                    "TauRefrac": 5.0}
+test_ssa_input_init = {"startSpike": test_start_spike,
+                       "endSpike": test_end_spike}
+
+test_lif_init = {"V": -60.0,
+                 "RefracTime": 0.0}
+
+TEST_LIF_PARAMS = {"C": 10.0,
+                   "TauM": 10.0,
+                   "Vrest": -60.0,
+                   "Vreset": -60.0,
+                   "Vthresh": -50.0,
+                   "Ioffset": 0.0,
+                   "TauRefrac": 5.0}
 
 """
 We're ready to build our model!

@@ -288,6 +288,19 @@ model.build(path_to_model=MODEL_BUILD_DIR)
 model.load(path_to_model=MODEL_BUILD_DIR)
 
 """
+We use Xavier initialization to set the weights of the inp2hid and hid2out connections
+"""
+a = 1.0 / np.sqrt(N_INPUT)
+inp2hid_wt_init = np.random.uniform(low=-a, high=a, size=N_INPUT*N_HIDDEN)
+inp2hid.vars["w"].view[:] = inp2hid_wt_init
+model.push_var_to_device("inp2hid", "w")
+a = 1.0 / np.sqrt(N_HIDDEN)
+hid2out_wt_init = np.random.uniform(low=-a, high=a, size=N_HIDDEN*N_OUTPUT)
+hid2out.vars["w"].view[:] = hid2out_wt_init
+model.push_var_to_device("hid2out", "w")
+
+
+"""
 Before we start the simulation, we need to define some shorthands that
 we can use to access different model variables at simulation time. 
 """

@@ -1,18 +1,21 @@
 """
-Custom LIF neuron for SuperSpike
+Custom neuron models for SuperSpike
 """
 
 from pygenn.genn_model import create_custom_neuron_class, create_dpf_class, init_var, create_custom_postsynaptic_class
 from numpy import exp, log, random
 
-# OUTPUT NEURON MODEL for precisely timed spikes #
+"""
+Output neuron model for task to reproduce precisely timed spikes
+This is a general model for the case of multiple output neurons.
+"""
 output_model = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
                  "t_rise", "t_decay", "beta", "t_peak"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
-                    ("mismatch", "scalar"), ("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
+                    ("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -35,9 +38,9 @@ output_model = create_custom_neuron_class(
         S_pred = 1.0;
     }
     const scalar S_real = $(RefracTime) <= 0.0 && $(V) >= $(Vthresh) ? 1.0 : 0.0;
-    $(mismatch) = S_pred - S_real;
-    $(err_rise) = ($(err_rise) * $(t_rise_mult)) + $(mismatch);
-    $(err_decay) = ($(err_decay) * $(t_decay_mult)) + $(mismatch);
+    const scalar mismatch = S_pred - S_real;
+    $(err_rise) = ($(err_rise) * $(t_rise_mult)) + mismatch;
+    $(err_decay) = ($(err_decay) * $(t_decay_mult)) + mismatch;
     $(err_tilda) = ($(err_decay) - $(err_rise)) * $(norm_factor);
     """,
     reset_code="""
@@ -68,6 +71,7 @@ OUTPUT_PARAMS = {"C": 10.0,
                  "t_decay": 10.0,
                  "beta": 1.0}
 
+
 OUTPUT_PARAMS["t_peak"] = ((OUTPUT_PARAMS["t_decay"] * OUTPUT_PARAMS["t_rise"]) / (
         OUTPUT_PARAMS["t_decay"] - OUTPUT_PARAMS["t_rise"])) \
                           * log(OUTPUT_PARAMS["t_decay"] / OUTPUT_PARAMS["t_rise"])
@@ -77,9 +81,11 @@ output_init = {"V": -60,
                "sigma_prime": 0.0,
                "err_rise": 0.0,
                "err_decay": 0.0,
-               "err_tilda": 0.0,
-               "mismatch": 0.0}
+               "err_tilda": 0.0}
 # startSpike and endSpike to be specified in simulation script
+
+
+
 
 # HIDDEN NEURON MODEL #
 

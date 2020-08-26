@@ -3,8 +3,6 @@ models/__pycache__/
 .idea
 __pycache__/
 .ipynb_checkpoints
-fig1_CODE
-superspike_CODE
 *.png
 *_CODE
 imgs
@@ -12,8 +10,6 @@ imgs
 test.py
 *.pkl
 prep.py
-*.out
-xor_stdp.py
 Untitled.ipynb
 test_config.py
 model_time.py
@@ -23,3 +19,4 @@ mnist_testing.py
 make_spikes.py
 distance_test.py
 thesis_things
+

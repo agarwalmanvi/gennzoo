@@ -14,6 +14,14 @@ from math import ceil
 import configparser
 import sys
 
+"""
+To run this experiment with a config, you should use 
+python xor.py /path/to/config.ini
+An example config file is given in /config/cfg.ini
+If you want to use the default settings you can omit the config file and run the script as
+python xor.py
+"""
+
 if len(sys.argv) > 1:
 	cfg_file = sys.argv[1]
 	config = configparser.ConfigParser()
@@ -30,9 +38,8 @@ else:
 	TRIALS = 1001
 
 model_name = experiment_type + "_" + str(learning_rate)
-# IMG_DIR = os.path.join("/data", "p286814", "imgs", experiment_type, learning_rate)
+# Create this directory before running the script
 IMG_DIR = "imgs"
-# MODEL_BUILD_DIR = os.environ.get('TMPDIR') + os.path.sep
 MODEL_BUILD_DIR = "./"
 
 TIME_FACTOR = 0.1
@@ -557,6 +564,8 @@ for trial in range(TRIALS):
 					best_acc = accuracy
 					best_trial = trial
 
+		# At the end of each simulation time step, we would also like to
+		# record the variables we need for making a plot
 		if trial % plot_interval == 0:
 			model.pull_current_spikes_from_device("inp")
 			times = np.ones_like(inp.current_spikes) * model.t
@@ -625,7 +634,7 @@ for trial in range(TRIALS):
 	plt.close()
 
 """
-With this script, we should see some plots in the `IMG_DIR`.
+With this script, we should see the plots in the `IMG_DIR`.
 We can also add some code below to dump all the variables that we have been keeping
 track of through the simulation, such as the weights or the best configuration after testing
 or the history of errors.

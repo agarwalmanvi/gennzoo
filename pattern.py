@@ -9,39 +9,22 @@ from models.neurons.lif_superspike import (output_model, OUTPUT_PARAMS, output_i
 from models.synapses.superspike import (superspike_model, SUPERSPIKE_PARAMS, superspike_init,
                                         feedback_wts_model, feedback_wts_init)
 import os
-import random
-import pickle as pkl
-from math import ceil
+from utils import create_poisson_spikes, get_mean_square_error
 
 
-def get_mean_square_error(scale_tr_err_flt, avgsqrerr, get_time, tau_avg_err):
-    temp = scale_tr_err_flt * np.mean(avgsqrerr)
-    time_in_secs = get_time / 1000
-    div = 1.0 - np.exp(-time_in_secs / tau_avg_err) + 1e-9
-    error = temp / div
-    return error
+"""
+In this script, we will reproduce the experiment corresponding to Figure 6 from the
+Superspike paper. The task is to make the output neurons produce a desired spike train
+in response to a frozen noisy Poisson input spike train.
+Below, we use the target spike train given in the paper's GitHub repository:
+https://github.com/fzenke/pub2018superspike
+The spike train is in a .ras file. The file is structured as pairs of
+spike times (in seconds) and neuron indices. We first import the file and process it into
+two arrays that record the spike times (in `times`) and the neuron indices (in `neurons`)
+respectively. We also make a plot to have a look at what the target pattern looks like.
+"""
 
-
-def create_poisson_spikes(interval, freq, spike_dt, time_factor):
-    """
-    Create poisson spike train for 1 neuron
-    :param interval: time period to create spikes for (ms)
-    :param freq: spiking frequency (Hz)
-    :param spike_dt: length of smallest timestep (if 1 ms, use 0.001)
-    :return: spike times in ms (np.array) within given time interval for 1 neuron
-    """
-    compare_num = freq * (spike_dt * TIME_FACTOR)
-    spike_train = np.random.random_sample(int(interval / time_factor))
-    spike_train = (spike_train < compare_num).astype(int)
-    spike_times_gen = np.nonzero(spike_train)[0]
-    spike_times_gen = np.multiply(spike_times_gen, time_factor)
-    return spike_times_gen
-
-
-########## Target spike train #########
-
-# f_path = "/home/manvi/Documents/pub2018superspike/themes/oxford-target.ras"
-f_path = "/home/p286814/pygenn/gennzoo_cluster/oxford-target.ras"
+f_path = "/home/manvi/Documents/pub2018superspike/themes/oxford-target.ras"
 times = []
 neurons = []
 c = 0
@@ -55,14 +38,16 @@ with open(f_path) as f:
 
 print("Processed " + str(c) + " rows.")
 
-# # Plot the target pattern
-# fig, ax = plt.subplots()
-# ax.scatter(times, neurons, s=0.5)
-# plt.savefig("target_pattern.png")
-# plt.close()
+# Plot the target pattern
+fig, ax = plt.subplots()
+ax.scatter(times, neurons, s=0.5)
+plt.savefig("target_pattern.png")
+plt.close()
 
-# PARAMETERS
-update_time = 10 * 1000
+"""
+We set up some parameters to define how the simulation should work
+"""
+update_time = 10 * 1000 # ms
 TIMESTEPS = 1890  # ms
 N_INPUT = 200
 N_OUTPUT = N_INPUT
@@ -74,14 +59,15 @@ spike_dt = 0.001  # 1 ms
 SUPERSPIKE_PARAMS['r0'] = 0.005
 SUPERSPIKE_PARAMS['update_t'] = update_time
 
-model_name_build = "pattern_005_256_c"
-# IMG_DIR = "/home/manvi/Documents/gennzoo/imgs_xor_test"
-IMG_DIR = os.path.join("/data/p286814/", model_name_build)
+model_name_build = "pattern"
+IMG_DIR = "imgs"
 
-MODEL_BUILD_DIR = os.environ.get('TMPDIR') + os.path.sep
-# MODEL_BUILD_DIR = "./"
+MODEL_BUILD_DIR = "./"
 
-######### Create static spike trains for target patterns ##############
+"""
+We create the data structures we need in order to specify
+the target spike train, repeated over several trials.
+"""
 
 target_times = np.array(times)
 target_neurons = np.array(neurons)
@@ -104,7 +90,10 @@ target_start_spike[1:] = target_end_spike[0:-1]
 
 target_spikeTimes = np.hstack(target_poisson_spikes).astype(float)
 
-######### Create static spike trains for input ##############
+"""
+We also create the spike trains we need for the
+repeating Poisson input noise.
+"""
 
 poisson_spikes = []
 
@@ -125,17 +114,9 @@ start_spike[1:] = end_spike[0:-1]
 
 spikeTimes = np.hstack(poisson_spikes).astype(float)
 
-# fig, ax = plt.subplots(figsize=(20, 5))
-# total_time = TIMESTEPS * TRIALS
-# for neuron_idx in range(N_INPUT):
-#     x_plot = poisson_spikes[neuron_idx]
-#     ax.scatter(x_plot, [neuron_idx] * len(x_plot), s=0.5, c='blue')
-#     for trial_idx in range(TRIALS):
-#         ax.axvline(x=TIMESTEPS * trial_idx)
-# save_filename = os.path.join(IMG_DIR, "input_spike_train.png")
-# plt.savefig(save_filename)
-
-########### Custom spike source array neuron model ############
+"""
+Finally, we are ready to specify a custom input neuron model and the model.
+"""
 
 ssa_input_model = genn_model.create_custom_neuron_class(
     "ssa_input_model",
@@ -166,8 +147,6 @@ ssa_input_init = {"startSpike": start_spike,
                   "endSpike": end_spike,
                   "z": 0.0,
                   "z_tilda": 0.0}
-
-########### Build model ################
 
 model = genn_model.GeNNModel("float", model_name_build)
 model.dT = 1.0 * TIME_FACTOR
@@ -200,7 +179,10 @@ out2hid = model.add_synapse_population("out2hid", "DENSE_INDIVIDUALG", genn_wrap
 model.build(path_to_model=MODEL_BUILD_DIR)
 model.load(path_to_model=MODEL_BUILD_DIR)
 
-########## SIMULATE ############
+"""
+Before we start the simulation, we need to specify some variables 
+to make it easier for us to access model variables at simulation time.
+"""
 
 out_voltage = out.vars['V'].view
 inp_z = inp.vars['z'].view
@@ -221,6 +203,9 @@ wts_hid2out = np.array([np.empty(0) for _ in range(N_HIDDEN * N_OUTPUT)])
 
 plot_interval = 50
 
+"""
+We also create all the ingredients needed to calculate the error
+"""
 a = 10.0
 b = 5.0
 tau_avg_err = 10.0
@@ -230,13 +215,22 @@ mul_avgsqrerr = np.exp(-TIME_FACTOR / tau_avg_err)
 avgsqrerr = np.zeros(shape=N_OUTPUT)
 record_avgsqerr = np.empty(0)
 
+"""
+Finally, we will use symmetric feedback in this experiment.
+Before the start of the simulation, we need to initialize the feedback
+weights to be equal to the feedforward weights.
+"""
+model.pull_var_from_device("hid2out", "w")
+h2o_weights = hid2out.get_var_values("w")
+out2hid.vars['g'].view[:] = h2o_weights
+model.push_var_to_device("out2hid", "g")
+
 for trial_idx in range(TRIALS):
 
     print("Trial: " + str(trial_idx))
 
     out_voltage[:] = OUTPUT_PARAMS["Vrest"]
     model.push_var_to_device('out', "V")
-
     inp_z[:] = ssa_input_init['z']
     model.push_var_to_device("inp", "z")
     inp_z_tilda[:] = ssa_input_init["z_tilda"]
@@ -255,18 +249,14 @@ for trial_idx in range(TRIALS):
     model.push_var_to_device("hid2out", "e")
     inp2hid_e[:] = 0.0
     model.push_var_to_device("inp2hid", "e")
-
     out_err_tilda[:] = 0.0
     model.push_var_to_device('out', 'err_tilda')
     hid_err_tilda[:] = 0.0
     model.push_var_to_device('hid', 'err_tilda')
-
     out.vars["err_rise"].view[:] = 0.0
     model.push_var_to_device('out', 'err_rise')
     out.vars["err_decay"].view[:] = 0.0
     model.push_var_to_device('out', 'err_decay')
-
-    # Symmetric feedback
     model.pull_var_from_device("hid2out", "w")
     h2o_weights = hid2out.get_var_values("w")
     out2hid_wts[:] = h2o_weights
@@ -297,9 +287,28 @@ for trial_idx in range(TRIALS):
 
         if model.t % update_time == 0 and model.t != 0:
             error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, time_elapsed, tau_avg_err)
-            print("Error: " + str(error))
             record_avgsqerr = np.hstack((record_avgsqerr, error))
             avgsqrerr = np.zeros(shape=N_OUTPUT)
+
+            # Record the weights after they have been updated
+            model.pull_var_from_device("inp2hid", "w")
+            weights = inp2hid.get_var_values("w")
+            weights = np.reshape(weights, (weights.shape[0], 1))
+            wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
+
+            model.pull_var_from_device("hid2out", "w")
+            h2o_weights = hid2out.get_var_values("w")
+            weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
+            wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
+
+            """
+            Since the feedforward weights have been updated, we need to
+            also update the feedback weights since we are using symmetric feedback
+            """
+            model.pull_var_from_device("hid2out", "w")
+            h2o_weights = hid2out.get_var_values("w")
+            out2hid.vars['g'].view[:] = h2o_weights
+            model.push_var_to_device("out2hid", "g")
 
         if trial_idx % plot_interval == 0:
 
@@ -317,17 +326,6 @@ for trial_idx in range(TRIALS):
             times = np.ones_like(out.current_spikes) * model.t
             out_spike_ids = np.hstack((out_spike_ids, out.current_spikes))
             out_spike_times = np.hstack((out_spike_times, times))
-
-    # Record the weights at the end of the trial
-    model.pull_var_from_device("inp2hid", "w")
-    weights = inp2hid.get_var_values("w")
-    weights = np.reshape(weights, (weights.shape[0], 1))
-    wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
-
-    model.pull_var_from_device("hid2out", "w")
-    h2o_weights = hid2out.get_var_values("w")
-    weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
-    wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
 
     if trial_idx % plot_interval == 0:
 
@@ -355,38 +353,9 @@ for trial_idx in range(TRIALS):
         plt.savefig(save_filename)
         plt.close()
 
-
-# Plot weights as a pixel plot with a colorbar
-print("Creating wts_inp2hid")
-plt.figure(figsize=(20, 50))
-plt.imshow(wts_inp2hid, cmap='gray')
-plt.colorbar()
-plt.yticks(list(range(wts_inp2hid.shape[0])))
-plt.xticks(list(range(wts_inp2hid.shape[1])))
-save_filename = os.path.join(IMG_DIR, "wts_inp2hid.png")
-plt.savefig(save_filename)
-plt.close()
-print("Creating wts_hid2out")
-plt.figure(figsize=(20, 50))
-plt.imshow(wts_hid2out, cmap='gray')
-plt.colorbar()
-plt.yticks(list(range(wts_hid2out.shape[0])))
-plt.xticks(list(range(wts_hid2out.shape[1])))
-save_filename = os.path.join(IMG_DIR, "wts_hid2out.png")
-plt.savefig(save_filename)
-plt.close()
-
-print("Creating plot for avgsqerr")
-fig, ax = plt.subplots()
-ax.plot(list(range(len(record_avgsqerr))), record_avgsqerr)
-ax.axhline(y=0.0)
-save_filename = os.path.join(IMG_DIR, "avgsqerr.png")
-plt.savefig(save_filename)
-plt.close()
-
-with open(os.path.join(IMG_DIR, "record_avgsqerr.pkl"), "wb") as f:
-    pkl.dump(record_avgsqerr, f)
-
-print("Dumped in pickle file.")
-print("Complete.")
+"""
+Just as in the script for xor and the timed spikes experiments, 
+we can choose to use the weights or the error by making a plot
+or dumping the values in a pickle file.
+"""
 

@@ -19,4 +19,5 @@ mnist_testing.py
 make_spikes.py
 distance_test.py
 thesis_things
+superspike_test.py
 

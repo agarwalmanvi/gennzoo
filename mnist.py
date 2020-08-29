@@ -14,14 +14,7 @@ import pickle as pkl
 from math import ceil
 from mlxtend.data import loadlocal_mnist
 from sklearn.preprocessing import minmax_scale
-
-
-def get_mean_square_error(scale_tr_err_flt, avgsqrerr, get_time, tau_avg_err):
-    temp = scale_tr_err_flt * np.mean(avgsqrerr)
-    time_in_secs = get_time / 1000
-    div = 1.0 - np.exp(-time_in_secs / tau_avg_err) + 1e-9
-    error = temp / div
-    return error
+from utils import get_mean_square_error
 
 
 with open("MNIST_train_spike.pkl", "rb") as f:

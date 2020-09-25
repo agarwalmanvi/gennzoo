@@ -286,7 +286,7 @@ for trial_idx in range(TRIALS):
         avgsqrerr = np.add(avgsqrerr, temp)
 
         if model.t % update_time == 0 and model.t != 0:
-            error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, time_elapsed, tau_avg_err)
+            error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, model.t, tau_avg_err)
             record_avgsqerr = np.hstack((record_avgsqerr, error))
             avgsqrerr = np.zeros(shape=N_OUTPUT)
 

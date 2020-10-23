@@ -10,6 +10,7 @@ from models.synapses.superspike import (superspike_model, SUPERSPIKE_PARAMS, sup
                                         feedback_wts_model, feedback_wts_init)
 import os
 from utils import create_poisson_spikes, get_mean_square_error
+from models.parameters import update_time_ms, tau_avg_err, wmin, wmax, r0
 
 
 """
@@ -47,17 +48,14 @@ plt.close()
 """
 We set up some parameters to define how the simulation should work
 """
-update_time = 3 * 1000 # ms
 TIMESTEPS = 1890  # ms
 N_INPUT = 200
 N_OUTPUT = N_INPUT
-TRIALS = 2000
+TRIALS = 600
 INPUT_FREQ = 5  # Hz
 TIME_FACTOR = 0.1
 N_HIDDEN = 256
 spike_dt = 0.001  # 1 ms
-SUPERSPIKE_PARAMS['r0'] = 0.05
-SUPERSPIKE_PARAMS['update_t'] = update_time
 
 model_name_build = "pattern"
 IMG_DIR = "imgs"
@@ -159,7 +157,7 @@ hid = model.add_neuron_population("hid", N_HIDDEN, hidden_model, HIDDEN_PARAMS, 
 output_init['startSpike'] = target_start_spike
 output_init['endSpike'] = target_end_spike
 out = model.add_neuron_population("out", N_OUTPUT, output_model, OUTPUT_PARAMS, output_init)
-out.set_extra_global_param("spike_times", target_spikeTimes)
+out.set_extra_global_param("spikeTimes", target_spikeTimes)
 
 inp2hid = model.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, hid,
@@ -201,18 +199,18 @@ out2hid_wts = out2hid.vars['g'].view
 wts_inp2hid = np.array([np.empty(0) for _ in range(N_INPUT * N_HIDDEN)])
 wts_hid2out = np.array([np.empty(0) for _ in range(N_HIDDEN * N_OUTPUT)])
 
-plot_interval = 50
+plot_interval = 10
 
 """
 We also create all the ingredients needed to calculate the error
 """
 a = 10.0
 b = 5.0
-tau_avg_err = 10.0
+# tau_avg_err = 10.0
 scale_tr_err_flt = 1.0 / ((((a * b) / (a - b)) ** 2) * (a / 2 + b / 2 - 2 * (a * b) / (a + b))) / tau_avg_err
-mul_avgsqrerr = np.exp(-TIME_FACTOR / tau_avg_err)
+# mul_avgsqrerr = np.exp(-TIME_FACTOR / tau_avg_err)
 
-avgsqrerr = np.zeros(shape=N_OUTPUT)
+# avgsqrerr = np.zeros(shape=N_OUTPUT)
 record_avgsqerr = np.empty(0)
 
 """
@@ -222,14 +220,28 @@ weights to be equal to the feedforward weights.
 """
 model.pull_var_from_device("hid2out", "w")
 h2o_weights = hid2out.get_var_values("w")
+h2o_weights = np.reshape(h2o_weights, newshape=(N_HIDDEN, N_OUTPUT))
+h2o_weights = np.transpose(h2o_weights).flatten()
 out2hid.vars['g'].view[:] = h2o_weights
 model.push_var_to_device("out2hid", "g")
 
-plot_threshold = 750
+plot_threshold = 0
+error = 100000
+
+steps_in_trial = int(TIMESTEPS / TIME_FACTOR)
 
 for trial_idx in range(TRIALS):
 
+    if trial_idx == 400:
+        inp2hid.vars["r0"].view[:] = r0 * 0.1
+        model.push_var_to_device('inp2hid', "r0")
+        hid2out.vars["r0"].view[:] = r0 * 0.1
+        model.push_var_to_device('hid2out', "r0")
+        print("Changed r0 to: " + str(r0 * 0.1))
+
     print("Trial: " + str(trial_idx))
+    if trial_idx % 10 == 0:
+        print("Error: " + str(error))
 
     out_voltage[:] = OUTPUT_PARAMS["Vrest"]
     model.push_var_to_device('out', "V")
@@ -275,40 +287,17 @@ for trial_idx in range(TRIALS):
             out_spike_ids = np.empty(0)
             out_spike_times = np.empty(0)
 
-            # hid_z_tilda_arr = [np.empty(0) for _ in range(N_HIDDEN)]
-            # out_sigma_prime_arr = [np.empty(0) for _ in range(N_OUTPUT)]
-            # hid2out_lambda_arr = [np.empty(0) for _ in range(N_HIDDEN*N_OUTPUT)]
-            # hid2out_m_arr = [np.empty(0) for _ in range(N_HIDDEN*N_OUTPUT)]
-
-    steps_in_trial = int(TIMESTEPS / TIME_FACTOR)
-
     for t in range(steps_in_trial):
 
         model.step_time()
 
-        # Calculate learning curve
-        # model.pull_var_from_device("out", "err_tilda")
-        # temp = out_err_tilda[:]
-        # temp = np.power(temp, 2)
-        # temp = np.multiply(temp, TIME_FACTOR)
-        # avgsqrerr = np.multiply(avgsqrerr, mul_avgsqrerr)
-        # avgsqrerr = np.add(avgsqrerr, temp)
-
-        if model.t % update_time == 0 and model.t != 0:
-            # error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, model.t, tau_avg_err)
-            # record_avgsqerr = np.hstack((record_avgsqerr, error))
-            # avgsqrerr = np.zeros(shape=N_OUTPUT)
-            #
-            # # Record the weights after they have been updated
-            # model.pull_var_from_device("inp2hid", "w")
-            # weights = inp2hid.get_var_values("w")
-            # weights = np.reshape(weights, (weights.shape[0], 1))
-            # wts_inp2hid = np.concatenate((wts_inp2hid, weights), axis=1)
-            #
-            # model.pull_var_from_device("hid2out", "w")
-            # h2o_weights = hid2out.get_var_values("w")
-            # weights = np.reshape(h2o_weights, (h2o_weights.shape[0], 1))
-            # wts_hid2out = np.concatenate((wts_hid2out, weights), axis=1)
+        if model.t % update_time_ms == 0 and model.t != 0:
+            model.pull_var_from_device("out", "avg_sq_err")
+            avgsqrerr = out.vars["avg_sq_err"].view[:]
+            error = get_mean_square_error(scale_tr_err_flt, avgsqrerr, model.t, tau_avg_err)
+            record_avgsqerr = np.hstack((record_avgsqerr, error))
+            out.vars["avg_sq_err"].view[:] = np.zeros(shape=N_OUTPUT)
+            model.push_var_to_device("out", "avg_sq_err")
 
             """
             Since the feedforward weights have been updated, we need to
@@ -316,6 +305,8 @@ for trial_idx in range(TRIALS):
             """
             model.pull_var_from_device("hid2out", "w")
             h2o_weights = hid2out.get_var_values("w")
+            h2o_weights = np.reshape(h2o_weights, newshape=(N_HIDDEN, N_OUTPUT))
+            h2o_weights = np.transpose(h2o_weights).flatten()
             out2hid.vars['g'].view[:] = h2o_weights
             model.push_var_to_device("out2hid", "g")
 
@@ -337,33 +328,12 @@ for trial_idx in range(TRIALS):
                 out_spike_ids = np.hstack((out_spike_ids, out.current_spikes))
                 out_spike_times = np.hstack((out_spike_times, times))
 
-                # model.pull_var_from_device("hid", "z_tilda")
-                # new_hid_z_tilda = hid.vars["z_tilda"].view[:]
-                # for i in range(N_HIDDEN):
-                #     hid_z_tilda_arr[i] = np.hstack((hid_z_tilda_arr[i], new_hid_z_tilda[i]))
-                #
-                # model.pull_var_from_device("out", "sigma_prime")
-                # new_sigma_prime = out.vars["sigma_prime"].view[:]
-                # for i in range(N_OUTPUT):
-                #     out_sigma_prime_arr[i] = np.hstack((out_sigma_prime_arr[i], new_sigma_prime[i]))
-                #
-                # model.pull_var_from_device("hid2out", "lambda")
-                # new_lambda = hid2out.vars["lambda"].view[:]
-                # for i in range(N_HIDDEN*N_OUTPUT):
-                #     hid2out_lambda_arr[i] = np.hstack((hid2out_lambda_arr[i], new_lambda[i]))
-                #
-                # model.pull_var_from_device("hid2out", "m")
-                # new_m = hid2out.vars["m"].view[:]
-                # for i in range(N_HIDDEN * N_OUTPUT):
-                #     hid2out_m_arr[i] = np.hstack((hid2out_m_arr[i], new_m[i]))
-
     if trial_idx >= plot_threshold:
         if trial_idx % plot_interval == 0:
 
             print("Creating plot")
 
             fig, axes = plt.subplots(3, figsize=(15, 10), sharex=True)
-            # fig, axes = plt.subplots(3 + 4, figsize=(15, 10), sharex=True)
 
             point_size = 2.0
 
@@ -380,21 +350,6 @@ for trial_idx in range(TRIALS):
             axes[2].set_title("Output layer spikes")
 
             x_plot = list(range((trial_idx * TIMESTEPS), ((trial_idx + 1) * TIMESTEPS)))
-
-            # for i in range(N_HIDDEN):
-            #     axes[3].plot(x_plot, hid_z_tilda_arr[i])
-            # axes[3].set_title("Hidden Layer z_tilda")
-            #
-            # for i in range(N_OUTPUT):
-            #     axes[4].plot(x_plot, out_sigma_prime_arr[i])
-            # axes[4].set_title("Output Layer sigma_prime")
-            #
-            # for i in range(N_HIDDEN*N_OUTPUT):
-            #     axes[5].plot(x_plot, hid2out_lambda_arr[i])
-            #     axes[6].plot(x_plot, hid2out_m_arr[i])
-            # axes[5].set_title("hid2out Lambda")
-            # axes[6].set_title("hid2out m")
-
             axes[-1].set_xlabel("Time [ms]")
             xticks = list(range((trial_idx * TIMESTEPS), ((trial_idx + 1) * TIMESTEPS), 200))
             axes[-1].set_xticks(xticks)
@@ -402,6 +357,11 @@ for trial_idx in range(TRIALS):
             save_filename = os.path.join(IMG_DIR, "trial" + str(trial_idx) + ".png")
             plt.savefig(save_filename)
             plt.close()
+
+fig, ax = plt.subplots(figsize=(20, 12))
+ax.plot(list(range(len(record_avgsqerr))), record_avgsqerr)
+plt.savefig(os.path.join(IMG_DIR, "error.png"))
+plt.close()
 
 """
 Just as in the script for xor and the timed spikes experiments, 

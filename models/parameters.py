@@ -1,0 +1,10 @@
+t_rise = 5.0
+t_decay = 10.0
+tau_rms = 30000.0
+tau_avg_err = 10000.0
+r0 = 0.001 * 1000.0
+wmin = -0.1 * 1000.0
+wmax = 0.1 * 1000.0
+epsilon = 1e-32
+w0 = 0.05 * 1000.0
+update_time_ms = 500.0

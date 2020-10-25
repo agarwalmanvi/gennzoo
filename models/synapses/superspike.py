@@ -7,7 +7,7 @@ superspike_model = create_custom_weight_update_class(
     "superspike_model",
     param_names=["t_rise", "t_decay", "tau_rms", "wmax", "wmin", "epsilon", "update_t"],
     var_name_types=[("w", "scalar"), ("e", "scalar"), ("lambda", "scalar"), ("upsilon", "scalar"),
-                    ("m", "scalar"), ("grad_feedback", "scalar"), ("r0", "scalar")],
+                    ("m", "scalar"), ("r0", "scalar")],
     sim_code="""
     $(addToInSyn, $(w));
     """,
@@ -25,7 +25,6 @@ superspike_model = create_custom_weight_update_class(
         // calculate learning rate r
         $(upsilon) = fmax($(upsilon) * $(ExpRMS) , grad*grad);
         const scalar r = $(r0) / (sqrt($(upsilon))+$(epsilon));
-        $(grad_feedback) = r * grad;
         // update synaptic weight
         $(w) += r * grad;
         $(w) = fmin($(wmax), fmax($(wmin), $(w)));
@@ -50,7 +49,6 @@ superspike_init = {"w": init_var("Uniform", {"min": -0.001, "max": 0.001}),
                    "lambda": 0.0,
                    "upsilon": 0.0,
                    "m": 0.0,
-                   "grad_feedback": 0.0,
                    "r0": r0}
 
 """ Feedback weights model for out2hid connections """

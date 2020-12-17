@@ -7,3 +7,9 @@ __pycache__/
 *_CODE
 imgs
 *.pkl
+pattern_feedback.py
+models/synapses/superspike_lambda.py
+mnist_feedback.py
+mnist_save
+mnist_save.zip
+data

@@ -74,7 +74,6 @@ OUTPUT_PARAMS = {"C": 10.0,
                  "beta": 1.0,
                  "tau_avg_err": tau_avg_err}
 
-
 OUTPUT_PARAMS["t_peak"] = ((OUTPUT_PARAMS["t_decay"] * OUTPUT_PARAMS["t_rise"]) / (
         OUTPUT_PARAMS["t_decay"] - OUTPUT_PARAMS["t_rise"])) \
                           * log(OUTPUT_PARAMS["t_decay"] / OUTPUT_PARAMS["t_rise"])
@@ -155,11 +154,12 @@ hidden_init = {"V": -60,
 output_model_classification = create_custom_neuron_class(
     "lif_superspike",
     param_names=["C", "Tau_mem", "Vrest", "Vthresh", "Ioffset", "TauRefrac",
-                 "t_rise", "t_decay", "beta", "t_peak"],
+                 "t_rise", "t_decay", "beta", "t_peak", "tau_avg_err"],
     var_name_types=[("V", "scalar"), ("RefracTime", "scalar"), ("sigma_prime", "scalar"),
                     ("err_rise", "scalar"), ("err_tilda", "scalar"), ("err_decay", "scalar"),
                     ("mismatch", "scalar"),
-                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar")],
+                    ("S_pred", "scalar"), ("S_miss", "scalar"), ("window_of_opp", "scalar"),
+                   ("avg_sq_err", "scalar")],
     sim_code="""
     // membrane potential dynamics
     if ($(RefracTime) == $(TauRefrac)) {
@@ -193,6 +193,10 @@ output_model_classification = create_custom_neuron_class(
     $(err_rise) = ($(err_rise) * $(t_rise_mult)) + $(mismatch);
     $(err_decay) = ($(err_decay) * $(t_decay_mult)) + $(mismatch);
     $(err_tilda) = ($(err_decay) - $(err_rise)) * $(norm_factor);
+    // calculate average error trace
+    const scalar temp = $(err_tilda) * $(err_tilda) * DT * 0.001;
+    $(avg_sq_err) *= $(mul_avgerr);
+    $(avg_sq_err) += temp;
     """,
     reset_code="""
     $(RefracTime) = $(TauRefrac);
@@ -205,7 +209,8 @@ output_model_classification = create_custom_neuron_class(
                                          1.0 / (- exp(- pars[9] / pars[6]) + exp(
                                              - pars[9] / pars[7])))()),
         ("t_rise_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[6]))()),
-        ("t_decay_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[7]))())
+        ("t_decay_mult", create_dpf_class(lambda pars, dt: exp(- dt / pars[7]))()),
+        ("mul_avgerr", create_dpf_class(lambda pars, dt: exp(-dt / pars[10]))())
     ]
 )
 
@@ -218,7 +223,8 @@ output_init_classification = {"V": -60,
                               "mismatch": 0.0,
                               "S_pred": 0.0,
                               "S_miss": 0.0,
-                              "window_of_opp": 0.0}
+                              "window_of_opp": 0.0,
+                               "avg_sq_err": 0.0}
 
 # Since this neuron model has the same parameters as `output_model`, we can reuse OUTPUT_PARAMS here.
 

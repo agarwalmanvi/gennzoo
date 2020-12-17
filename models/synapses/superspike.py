@@ -5,8 +5,10 @@ from models.parameters import *
 """ Weight update model for feedforward weights in SuperSpike """
 superspike_model = create_custom_weight_update_class(
     "superspike_model",
-    param_names=["t_rise", "t_decay", "tau_rms", "wmax", "wmin", "epsilon", "update_t"],
-    var_name_types=[("w", "scalar"), ("e", "scalar"), ("lambda", "scalar"), ("upsilon", "scalar"),
+    param_names=["t_rise", "t_decay", "tau_rms",
+                 "wmax", "wmin", "epsilon", "update_t"],
+    var_name_types=[("w", "scalar"), ("e", "scalar"),
+                    ("lambda", "scalar"), ("upsilon", "scalar"),
                     ("m", "scalar"), ("r0", "scalar")],
     sim_code="""
     $(addToInSyn, $(w));

@@ -112,7 +112,7 @@ inp.set_extra_global_param("spikeTimes", spikeTimes)
 output_init['startSpike'] = target_start_spike
 output_init['endSpike'] = target_end_spike
 out = model.add_neuron_population("out", 1, output_model, OUTPUT_PARAMS, output_init)
-out.set_extra_global_param("spike_times", target_spikeTimes)
+out.set_extra_global_param("spikeTimes", target_spikeTimes)
 
 inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, out,

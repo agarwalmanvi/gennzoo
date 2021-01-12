@@ -1,6 +1,7 @@
 import numpy as np
 # from scipy.stats import expon
 import matplotlib.pyplot as plt
+import os
 
 from pygenn import genn_wrapper
 from pygenn import genn_model
@@ -119,7 +120,7 @@ hid = model.add_neuron_population("hid", NUM_HIDDEN, hidden_model, HIDDEN_PARAMS
 output_init['startSpike'] = target_start_spike
 output_init['endSpike'] = target_end_spike
 out = model.add_neuron_population("out", 1, output_model, OUTPUT_PARAMS, output_init)
-out.set_extra_global_param("spike_times", target_spikeTimes)
+out.set_extra_global_param("spikeTimes", target_spikeTimes)
 
 inp2hid = model.add_synapse_population("inp2hid", "DENSE_INDIVIDUALG", genn_wrapper.NO_DELAY,
                                        inp, hid,
@@ -152,7 +153,9 @@ hid2out.vars["w"].view[:] = wt_init
 model.push_var_to_device("hid2out", "w")
 
 IMG_DIR = "imgs"
-
+if not os.path.exists(IMG_DIR):
+    os.makedirs(IMG_DIR)
+    
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
 out_err_tilda = out.vars['err_tilda'].view

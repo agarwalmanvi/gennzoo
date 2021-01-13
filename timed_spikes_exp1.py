@@ -8,6 +8,7 @@ from models.neurons.lif_superspike import output_model, OUTPUT_PARAMS, output_in
 from models.synapses.superspike import superspike_model, SUPERSPIKE_PARAMS, superspike_init
 import os
 from utils import create_poisson_spikes
+from models.parameters import r0
 
 
 """
@@ -17,11 +18,12 @@ In this experiment, one output neuron is trained to output
 from 100 input neurons.
 """
 
-interval = 500
+interval = 500  # ms
 PRESENT_TIMESTEPS = float(interval)
-TRIALS = 5001
+TRIALS = 2001
 # TRIALS = 10
 SUPERSPIKE_PARAMS["update_t"] = PRESENT_TIMESTEPS
+TIME_FACTOR = 0.1
 
 """
 First we create the poisson spike trains for all the input neurons.
@@ -36,7 +38,7 @@ freq = 8
 spike_dt = 0.001
 N_INPUT = 100
 for p in range(N_INPUT):
-    neuron_spike_train = create_poisson_spikes(interval, freq, spike_dt, 1.0)
+    neuron_spike_train = create_poisson_spikes(interval, freq, spike_dt, TIME_FACTOR)
     poisson_spikes.append(neuron_spike_train)
 
 spike_counts = [len(n) for n in poisson_spikes]
@@ -103,8 +105,8 @@ ssa_input_init = {"startSpike": start_spike,
                   "z_tilda": 0.0}
 
 ########### Build model ################
-model = genn_model.GeNNModel("float", "spike_source_array")
-model.dT = 1.0
+model = genn_model.GeNNModel("float", "spike_source_array", time_precision="double")
+model.dT = 1.0 * TIME_FACTOR
 
 inp = model.add_neuron_population("inp", 100, ssa_input_model, SSA_INPUT_PARAMS, ssa_input_init)
 inp.set_extra_global_param("spikeTimes", spikeTimes)
@@ -122,15 +124,17 @@ inp2out = model.add_synapse_population("inp2out", "DENSE_INDIVIDUALG", genn_wrap
 model.build()
 model.load()
 
-"""
-We use Xavier initialization to set the weights of the inp2hid and hid2out connections
-"""
-a = 1.0 / np.sqrt(N_INPUT)
-wt_init = np.random.uniform(low=-a, high=a, size=N_INPUT)
-inp2out.vars["w"].view[:] = wt_init
-model.push_var_to_device("inp2out", "w")
+# """
+# We use Xavier initialization to set the weights of the inp2hid and hid2out connections
+# """
+# a = 1.0 / np.sqrt(N_INPUT)
+# wt_init = np.random.uniform(low=-a, high=a, size=N_INPUT)
+# inp2out.vars["w"].view[:] = wt_init
+# model.push_var_to_device("inp2out", "w")
 
 IMG_DIR = "imgs"
+if not os.path.exists(IMG_DIR):
+    os.makedirs(IMG_DIR)
 
 spikeTimes_view = inp.extra_global_params['spikeTimes'].view
 start_spike_view = inp.vars['startSpike'].view
@@ -143,108 +147,106 @@ inp_z_tilda = inp.vars["z_tilda"].view
 inp2out_lambda = inp2out.vars['lambda'].view
 inp2out_e = inp2out.vars['e'].view
 
-plot_interval = 10
+plot_interval = 1
+steps_in_trial = int(PRESENT_TIMESTEPS / TIME_FACTOR)
 
 # wts = np.array([np.empty(0) for _ in range(N_INPUT)])
 
-while model.timestep < (PRESENT_TIMESTEPS * TRIALS):
-    # Calculate the timestep within the presentation
-    timestep_in_example = model.timestep % PRESENT_TIMESTEPS
-    trial = int(model.timestep // PRESENT_TIMESTEPS)
+base_timesteps = np.arange(int(PRESENT_TIMESTEPS), step=1.0*TIME_FACTOR)
 
-    if timestep_in_example == 0:
+print("r0 at the start: " + str(r0))
 
-        out_voltage[:] = OUTPUT_PARAMS["Vrest"]
-        model.push_var_to_device('out', "V")
-        inp_z[:] = ssa_input_init['z']
-        model.push_var_to_device("inp", "z")
-        inp_z_tilda[:] = ssa_input_init["z_tilda"]
-        model.push_var_to_device("inp", "z_tilda")
-        inp2out_lambda[:] = 0.0
-        model.push_var_to_device("inp2out", "lambda")
-        inp2out_e[:] = 0.0
-        model.push_var_to_device("inp2out", "e")
-        out_err_tilda[:] = 0.0
-        model.push_var_to_device('out', 'err_tilda')
-        out_err_rise[:] = 0.0
-        model.push_var_to_device('out', 'err_rise')
-        out_err_decay[:] = 0.0
-        model.push_var_to_device('out', 'err_decay')
+for trial in range(TRIALS):
 
-        produced_spike_train = []
+    if trial != 0 and trial % 600 == 0:
+        r0 *= 0.1
+        inp2out.vars["r0"].view[:] = r0
+        model.push_var_to_device('inp2out', "r0")
+        print("Changed r0 to: " + str(r0))
 
-        if trial % 10 == 0:
+    out_voltage[:] = OUTPUT_PARAMS["Vrest"]
+    model.push_var_to_device('out', "V")
+    inp_z[:] = ssa_input_init['z']
+    model.push_var_to_device("inp", "z")
+    inp_z_tilda[:] = ssa_input_init["z_tilda"]
+    model.push_var_to_device("inp", "z_tilda")
+    inp2out_lambda[:] = 0.0
+    model.push_var_to_device("inp2out", "lambda")
+    inp2out_e[:] = 0.0
+    model.push_var_to_device("inp2out", "e")
+    out_err_tilda[:] = 0.0
+    model.push_var_to_device('out', 'err_tilda')
+    out_err_rise[:] = 0.0
+    model.push_var_to_device('out', 'err_rise')
+    out_err_decay[:] = 0.0
+    model.push_var_to_device('out', 'err_decay')
 
-            print("Trial: " + str(trial))
+    produced_spike_train = []
+
+    if trial % 100 == 0:
+        print("Trial: " + str(trial))
+
+    if trial % plot_interval == 0:
+        spike_ids = np.empty(0)
+        spike_times = np.empty(0)
+        error = np.empty(0)
+        out_V = np.empty(0)
+
+    if trial != 0:
+        spikeTimes += PRESENT_TIMESTEPS
+
+        spikeTimes_view[:] = spikeTimes
+        model.push_extra_global_param_to_device("inp", "spikeTimes")
+
+        start_spike_view[:] = start_spike
+        model.push_var_to_device("inp", "startSpike")
+
+    for t in range(steps_in_trial):
+
+        model.step_time()
 
         if trial % plot_interval == 0:
 
-            spike_ids = np.empty(0)
-            spike_times = np.empty(0)
-            error = np.empty(0)
-            out_V = np.empty(0)
+            model.pull_current_spikes_from_device("inp")
+            times = np.ones_like(inp.current_spikes) * model.t
+            spike_ids = np.hstack((spike_ids, inp.current_spikes))
+            spike_times = np.hstack((spike_times, times))
 
-        if trial != 0:
-            spikeTimes += PRESENT_TIMESTEPS
+            model.pull_current_spikes_from_device("out")
+            if len(out.current_spikes) != 0:
+                produced_spike_train.append(model.t)
 
-            spikeTimes_view[:] = spikeTimes
-            model.push_extra_global_param_to_device("inp", "spikeTimes")
+            model.pull_var_from_device("out", "err_tilda")
+            error = np.hstack((error, out.vars["err_tilda"].view))
 
-            start_spike_view[:] = start_spike
-            model.push_var_to_device("inp", "startSpike")
-
-    model.step_time()
+            model.pull_var_from_device("out", "V")
+            out_V = np.hstack((out_V, out.vars["V"].view))
 
     if trial % plot_interval == 0:
 
-        model.pull_current_spikes_from_device("inp")
-        times = np.ones_like(inp.current_spikes) * model.t
-        spike_ids = np.hstack((spike_ids, inp.current_spikes))
-        spike_times = np.hstack((spike_times, times))
+        # print("Creating raster plot")
+        timesteps = base_timesteps + int(PRESENT_TIMESTEPS * trial)
 
-        model.pull_current_spikes_from_device("out")
-        if len(out.current_spikes) != 0:
-            produced_spike_train.append(model.t)
+        fig, axes = plt.subplots(4, sharex=True, figsize=(12, 10))
+        fig.tight_layout(pad=2.0)
 
-        model.pull_var_from_device("out", "err_tilda")
-        error = np.hstack((error, out.vars["err_tilda"].view))
+        target_spike_times_plot = base_target_spike_times + int(PRESENT_TIMESTEPS * trial)
+        axes[0].scatter(target_spike_times_plot, [1] * len(target_spike_times_plot))
+        axes[0].set_title("Target spike train")
+        axes[1].plot(timesteps, error)
+        axes[1].set_title("Error")
+        axes[2].plot(timesteps, out_V)
+        axes[2].axhline(y=OUTPUT_PARAMS["Vthresh"], linestyle="--", color="red")
+        axes[2].set_title("Membrane potential of output neuron")
+        for i in produced_spike_train:
+            axes[2].axvline(x=i, linestyle="--", color="red")
+        for i in target_spike_times_plot:
+            axes[2].axvline(x=i, linestyle="--", color="green")
+        axes[3].scatter(spike_times, spike_ids, s=10)
+        axes[3].set_title("Input spikes")
 
-        model.pull_var_from_device("out", "V")
-        out_V = np.hstack((out_V, out.vars["V"].view))
+        axes[-1].set_xlabel("Time [ms]")
 
-    if timestep_in_example == (PRESENT_TIMESTEPS - 1):
-
-        # model.pull_var_from_device("inp2out", "w")
-        # weights = inp2out.get_var_values("w")
-        # weights = np.reshape(weights, (weights.shape[0], 1))
-        # wts = np.concatenate((wts, weights), axis=1)
-
-        if trial % plot_interval == 0:
-
-            # print("Creating raster plot")
-            timesteps = np.arange(int(PRESENT_TIMESTEPS))
-            timesteps += int(PRESENT_TIMESTEPS * trial)
-
-            fig, axes = plt.subplots(4, sharex=True, figsize=(12, 10))
-            fig.tight_layout(pad=2.0)
-
-            target_spike_times_plot = base_target_spike_times + int(PRESENT_TIMESTEPS * trial)
-            axes[0].scatter(target_spike_times_plot, [1]*len(target_spike_times_plot))
-            axes[0].set_title("Target spike train")
-            axes[1].plot(timesteps, error)
-            axes[1].set_title("Error")
-            axes[2].plot(timesteps, out_V)
-            axes[2].axhline(y=OUTPUT_PARAMS["Vthresh"], linestyle="--", color="red")
-            axes[2].set_title("Membrane potential of output neuron")
-            for i in produced_spike_train:
-                axes[2].axvline(x=i, linestyle="--", color="red")
-            for i in target_spike_times_plot:
-                axes[2].axvline(x=i, linestyle="--", color="green")
-            axes[3].scatter(spike_times, spike_ids, s=10)
-            axes[3].set_title("Input spikes")
-
-            axes[-1].set_xlabel("Time [ms]")
-
-            save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
-            plt.savefig(save_filename)
-            plt.close()
+        save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
+        plt.savefig(save_filename)
+        plt.close()

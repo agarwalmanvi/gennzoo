@@ -17,10 +17,10 @@ from config.plot_config import plot_rcparams
 
 rcParams.update(plot_rcparams)
 
-# TODO: Complete the figure spec for this script
+# TODO The figures from this script correspond to Figures ... from our submitted paper.
+
 """
-In this script, we are going to recreate the experiment from Fig. 2 of the Superspike paper.
-The figures from this script correspond to Figures ... from our submitted paper.
+In this script, we are going to recreate the experiment from Fig. 2 (a,b,c) of the Superspike paper.
 In this experiment, one output neuron is trained to output
 5 equidistant spikes in response to a ms repeated noise Poisson spike train
 from 100 input neurons.
@@ -139,6 +139,8 @@ base_timesteps = np.arange(int(PRESENT_TIMESTEPS), step=1.0*TIME_FACTOR)
 
 print("r0 at the start: " + str(r0))
 
+# spike_times_arr stores the spikes of the output neuron for every trial
+# (used to produce the analogue of Fig. 2c in the paper)
 spike_times_arr = []
 
 """
@@ -248,7 +250,7 @@ for trial in range(TRIALS):
 
         axes[0].scatter(target_spike_times_plot, [1] * len(target_spike_times_plot), s=55)
         axes[0].set_title("Target spike train")
-        axes[0].set_xlim(0,500)
+        axes[0].set_xlim(timesteps[0], timesteps[-1]+1)
         axes[0].axes.get_yaxis().set_visible(False)
         axes[0].axes.get_xaxis().set_visible(False)
         [s.set_visible(False) for s in axes[0].spines.values()]
@@ -284,4 +286,12 @@ for trial in range(TRIALS):
 
 with open('spike_times_arr.pkl', 'wb') as f:
     pkl.dump(spike_times_arr, f)
+
+fig, ax = plt.subplots(figsize=(8,10))
+for i in range(len(spike_times_arr)):
+    x = np.array(spike_times_arr[i]) - (500*i)
+    y = [i] * len(x)
+    ax.scatter(x, y)
+
+plt.show()
 

@@ -153,6 +153,8 @@ record_avgsqerr = np.empty(0)
 
 steps_in_trial = int(PRESENT_TIMESTEPS / TIME_FACTOR)
 
+# TODO spike_times_trial and produced_spike_train seem to do the same thing!
+
 for trial in range(TRIALS):
 
     # Decrease the learning rate every 600th trial

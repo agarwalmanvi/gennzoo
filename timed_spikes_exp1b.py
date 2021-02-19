@@ -12,7 +12,7 @@ import pickle as pkl
 
 """
 In this script, we are going to recreate the experiment from Fig. 2d of the Superspike paper.
-We reuse code from five_spikes_raster.py
+We reuse code from timed_spikes_exp1a.py
 """
 
 TRIALS = 1600
@@ -168,8 +168,6 @@ for sim_idx in range(20):
 
             start_spike_view[:] = start_spike
             model.push_var_to_device("inp", "startSpike")
-
-        spike_times_trial = []
 
         for t in range(steps_in_trial):
 

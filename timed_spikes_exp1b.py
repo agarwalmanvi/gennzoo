@@ -132,13 +132,15 @@ for sim_idx in range(20):
     scale_tr_err_flt = 1.0 / ((((a * b) / (a - b)) ** 2) * (a / 2 + b / 2 - 2 * (a * b) / (a + b))) / tau_avg_err
     record_avgsqerr = np.empty(0)
 
+    base_r0 = r0
+
     for trial in range(TRIALS):
 
         if trial != 0 and trial % 600 == 0:
-            r0 *= 0.1
-            inp2out.vars["r0"].view[:] = r0
+            base_r0 *= 0.1
+            inp2out.vars["r0"].view[:] = base_r0
             model.push_var_to_device('inp2out', "r0")
-            # print("Changed r0 to: " + str(r0))
+            print("Changed r0 to: " + str(base_r0))
 
         out_voltage[:] = OUTPUT_PARAMS["Vrest"]
         model.push_var_to_device('out', "V")

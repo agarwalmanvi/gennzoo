@@ -172,7 +172,9 @@ for feedback_type in ["random", "symmetric", "uniform"]:
         5. Membrane potential of output neuron
         """
 
-        print("r0 at the start: " + str(r0))
+        base_r0 = r0
+
+        print("r0 at the start: " + str(base_r0))
 
         """
         We also create all the ingredients needed to calculate the error
@@ -188,12 +190,12 @@ for feedback_type in ["random", "symmetric", "uniform"]:
 
             # Decrease the learning rate every 600th trial
             if trial != 0 and trial % 600 == 0:
-                r0 *= 0.1
-                inp2hid.vars["r0"].view[:] = r0
+                base_r0 *= 0.1
+                inp2hid.vars["r0"].view[:] = base_r0
                 model.push_var_to_device('inp2hid', "r0")
-                hid2out.vars["r0"].view[:] = r0
+                hid2out.vars["r0"].view[:] = base_r0
                 model.push_var_to_device('hid2out', "r0")
-                print("Changed r0 to: " + str(r0))
+                print("Changed r0 to: " + str(base_r0))
 
             # Reset variables at the beginning of a trial
             out_voltage[:] = OUTPUT_PARAMS["Vrest"]

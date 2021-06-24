@@ -21,14 +21,19 @@ We reuse code from timed_spikes_exp2a.py
 
 TRIALS = 1600
 
-for feedback_type in ["random", "symmetric", "uniform"]:
+# for feedback_type in ["random", "symmetric", "uniform"]:
+for feedback_type in ["random"]:
 
     print("Feedback type: " + feedback_type)
 
     # avgsqerr_arr is a matrix with row=simulation number and col=trial number
-    avgsqerr_arr = np.zeros(shape=(20, TRIALS))
 
-    for sim_idx in range(20):
+    sim_num_total = 20
+    # sim_num_total = 1
+
+    avgsqerr_arr = np.zeros(shape=(sim_num_total, TRIALS))
+
+    for sim_idx in range(sim_num_total):
 
         print("Simulation: " + str(sim_idx))
 
@@ -133,7 +138,7 @@ for feedback_type in ["random", "symmetric", "uniform"]:
         model.push_var_to_device("hid2out", "w")
 
         if feedback_type == "random":
-            feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 1)).flatten()
+            feedback_wts = np.random.normal(-1.0, 1.0, size=(NUM_HIDDEN, 1)).flatten()
             out2hid.vars['g'].view[:] = feedback_wts
             model.push_var_to_device('out2hid', 'g')
         elif feedback_type == "symmetric":
@@ -247,6 +252,8 @@ for feedback_type in ["random", "symmetric", "uniform"]:
                 model.step_time()
 
                 if model.t % PRESENT_TIMESTEPS == 0 and model.t != 0 and feedback_type == "symmetric":
+                    print("Updating feedback weights")
+                    print(model.t)
                     model.pull_var_from_device("hid2out", "w")
                     ff_wts = hid2out.vars["w"].view[:]
                     ff_wts = np.transpose(np.reshape(ff_wts, newshape=(NUM_HIDDEN, 1)))

@@ -133,7 +133,7 @@ model.push_var_to_device("hid2out", "w")
 Here we will use random feedback. The feedback weights need to be set and pushed
 to the model only once at the start of the simulation, which we do below.
 """
-feedback_wts = np.random.normal(0.0, 1.0, size=(NUM_HIDDEN, 1)).flatten()
+feedback_wts = np.random.normal(-1.0, 1.0, size=(NUM_HIDDEN, 1)).flatten()
 out2hid.vars['g'].view[:] = feedback_wts
 model.push_var_to_device('out2hid', 'g')
 
@@ -185,7 +185,7 @@ steps_in_trial = int(PRESENT_TIMESTEPS / TIME_FACTOR)
 for trial in range(TRIALS):
 
     # Decrease the learning rate every 600th trial
-    if trial != 0 and trial % 600 == 0:
+    if trial != 0 and trial % 500 == 0:
         r0 *= 0.1
         inp2hid.vars["r0"].view[:] = r0
         model.push_var_to_device('inp2hid', "r0")
@@ -226,7 +226,7 @@ for trial in range(TRIALS):
 
     produced_spike_train = []
 
-    if trial % 10 == 0:
+    if trial % 100 == 0:
         print("Trial: " + str(trial))
 
     # Initialize data structures to store various things during a trial so we can make a nice plot later
@@ -328,6 +328,8 @@ for trial in range(TRIALS):
 
         for i in range(len(hidden_V)):
             ax_num = i+4
+            if i == 0:
+                axes[ax_num].set_title("Hidden units")
             axes[ax_num].plot(timesteps, hidden_V[i], linewidth=2.5)
             axes[ax_num].set_ylim(top=-45)
             for spike_idx in hidden_spikes[i]:

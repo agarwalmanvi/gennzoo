@@ -265,9 +265,10 @@ for trial in range(TRIALS):
 
         axes[2].plot(timesteps, out_V, linewidth=2.5)
         axes[2].axhline(y=OUTPUT_PARAMS["Vthresh"], linestyle="--", color="red", linewidth=3)
-        axes[2].text(x=timesteps[0]+30, y=-52, s=r"$U_{thresh}$", fontsize=20,
-                     horizontalalignment='center', verticalalignment='center',
-                     bbox=dict(facecolor='white', edgecolor="white"), color="red")
+        if trial == 0:
+            axes[2].text(x=timesteps[0]+30, y=-52, s=r"$U_{thresh}$", fontsize=20,
+                         horizontalalignment='center', verticalalignment='center',
+                         bbox=dict(facecolor='white', edgecolor="white"), color="red")
         axes[2].set_title("Membrane potential of output neuron")
         for i in produced_spike_train:
             axes[2].axvline(x=i, linestyle="dotted", color="red", linewidth=3, alpha=0.6)

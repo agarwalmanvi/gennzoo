@@ -44,8 +44,8 @@ python xor.py
 #     experiment_type = "default"
 #     TRIALS = 1001
 
-TRIALS = 6250
-# TRIALS = 5
+# TRIALS = 6250
+TRIALS = 200
 
 # model_name = experiment_type + "_" + str(learning_rate)
 # MODEL_BUILD_DIR = "./"
@@ -313,13 +313,21 @@ scale_tr_err_flt = 1.0 / ((((a * b) / (a - b)) ** 2) * (a / 2 + b / 2 - 2 * (a *
 record_avgsqerr = np.empty(0)
 
 time_elapsed = 0  # ms
-plot_interval = 1
+plot_interval = 5
 
 num_plots = 3
+t_start = 0
 
 print("r0 at the start: " + str(r0))
 
+colors = ['royalblue', 'magenta']
+c_start = 0
+
 for trial in range(TRIALS):
+
+    if trial % plot_interval == 0:
+        itis_plot = []
+        targets_plot = []
 
     if trial % 100 == 0:
         print("\n")
@@ -336,9 +344,13 @@ for trial in range(TRIALS):
 
     # We need some information about this trial...
     target = SAMPLES[drawn_samples[trial]][-1]
-    t_start = time_elapsed  # ms
+    targets_plot.append(target)
+    if trial % plot_interval == 0:
+        t_start = time_elapsed  # ms
     iti_chosen = itis[trial]  # ms
+    itis_plot.append(iti_chosen)
     total_time = STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + iti_chosen  # ms
+    # print(total_time)
 
     # Reinitialize or provide correct values for different variables at the start of the next trial
     out_voltage[:] = OUTPUT_PARAMS["Vrest"]
@@ -398,6 +410,13 @@ for trial in range(TRIALS):
     produced_spikes = []
 
     steps = int(total_time / TIME_FACTOR)
+    # print("steps: " + str(steps))
+
+    if trial % plot_interval == 0:
+        plot_steps = 0
+
+    # print("plot_steps: ")
+    # print(plot_steps)
 
     for t in range(steps):
 
@@ -429,28 +448,35 @@ for trial in range(TRIALS):
 
         # At the end of each simulation time step, we would also like to
         # record the variables we need for making a plot
-        if trial % plot_interval == 0:
-            model.pull_current_spikes_from_device("inp")
-            times = np.ones_like(inp.current_spikes) * model.t
-            inp_spike_ids = np.hstack((inp_spike_ids, inp.current_spikes))
-            inp_spike_times = np.hstack((inp_spike_times, times))
+        # if trial % plot_interval == 0:
+        model.pull_current_spikes_from_device("inp")
+        times = np.ones_like(inp.current_spikes) * model.t
+        inp_spike_ids = np.hstack((inp_spike_ids, inp.current_spikes))
+        inp_spike_times = np.hstack((inp_spike_times, times))
 
-            model.pull_current_spikes_from_device("hid")
-            times = np.ones_like(hid.current_spikes) * model.t
-            hid_spike_ids = np.hstack((hid_spike_ids, hid.current_spikes))
-            hid_spike_times = np.hstack((hid_spike_times, times))
+        model.pull_current_spikes_from_device("hid")
+        times = np.ones_like(hid.current_spikes) * model.t
+        hid_spike_ids = np.hstack((hid_spike_ids, hid.current_spikes))
+        hid_spike_times = np.hstack((hid_spike_times, times))
 
-            model.pull_var_from_device("out", "V")
-            out0_V = np.hstack((out0_V, out.vars["V"].view[0]))
-            out1_V = np.hstack((out1_V, out.vars["V"].view[1]))
+        model.pull_var_from_device("out", "V")
+        out0_V = np.hstack((out0_V, out.vars["V"].view[0]))
+        out1_V = np.hstack((out1_V, out.vars["V"].view[1]))
 
     time_elapsed += total_time
+
+    plot_steps += steps
 
     """
 	At the end of the trial, we can make a plot
 	"""
-    if trial % plot_interval == 0:
-        timesteps_plot = np.linspace(t_start, time_elapsed, num=steps)
+    if (trial+1) % plot_interval == 0:
+
+        print("Making a plot in trial " + str(trial))
+
+        print("t_start: " + str(t_start))
+        print("timee_elapsed: " + str(time_elapsed))
+        timesteps_plot = np.linspace(t_start, time_elapsed, num=plot_steps)
 
         # num_plots = 4
 
@@ -471,46 +497,49 @@ for trial in range(TRIALS):
         # axes[0].set_ylim(-1.1, 1.1)
         # axes[0].set_title("Error of output neurons")
 
-        axes[0].plot(timesteps_plot, out0_V, color="royalblue")
-        axes[0].plot(timesteps_plot, out1_V, color="magenta")
+        axes[0].plot(timesteps_plot, out0_V, color=colors[0])
+        axes[0].plot(timesteps_plot, out1_V, color=colors[1])
         axes[0].set_title("Membrane voltage of output neurons")
         axes[0].axhline(y=OUTPUT_PARAMS["Vthresh"])
         # axes[0].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS,
         #                 color="green", linestyle="--")
-        axes[0].axes.get_yaxis().set_visible(False)
-        axes[0].axes.get_xaxis().set_visible(False)
-        [s.set_visible(False) for s in axes[0].spines.values()]
+        # axes[0].axes.get_yaxis().set_visible(False)
+        # axes[0].axes.get_xaxis().set_visible(False)
+        # [s.set_visible(False) for s in axes[0].spines.values()]
 
         axes[1].scatter(inp_spike_times, inp_spike_ids)
         axes[1].set_ylim(-1, N_INPUT + 1)
         axes[1].set_title("Input layer spikes")
-        # axes[1].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
-        # axes[1].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
-        # axes[1].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
-        axes[1].axes.get_xaxis().set_visible(False)
-        axes[1].axes.get_yaxis().set_visible(False)
-        [s.set_visible(False) for s in axes[1].spines.values()]
-
+    #     # axes[1].axhline(y=INPUT_NUM[0][1] - 0.5, color="gray", linestyle="--")
+    #     # axes[1].axhline(y=INPUT_NUM[0][1] + INPUT_NUM[1][1] - 0.5, color="gray", linestyle="--")
+    #     # axes[1].axvline(x=t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, color="green", linestyle="--")
+    #     axes[1].axes.get_xaxis().set_visible(False)
+    #     axes[1].axes.get_yaxis().set_visible(False)
+    #     [s.set_visible(False) for s in axes[1].spines.values()]
+    #
         axes[2].scatter(hid_spike_times, hid_spike_ids)
         axes[2].set_ylim(-1, N_HIDDEN + 1)
         axes[2].set_title("Hidden layer spikes")
-        # axes[2].axes.get_xaxis().set_visible(False)
-        axes[2].axes.get_yaxis().set_visible(False)
-        [s.set_visible(False) for s in axes[2].spines.values()]
+    #     # axes[2].axes.get_xaxis().set_visible(False)
+    #     axes[2].axes.get_yaxis().set_visible(False)
+    #     [s.set_visible(False) for s in axes[2].spines.values()]
+    #
 
-    c = 'royalblue' if target == 0 else 'magenta'
+        for iti_idx in range(len(itis_plot)):+-
+            iti_plot = itis_plot[iti_idx]
+            c_end = c_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS
+            for ax_idx in range(num_plots):
+                axes[ax_idx].axvspan(c_start, c_end, facecolor=colors[targets_plot[iti_idx]], alpha=0.3)
+            c_start += STIMULUS_TIMESTEPS + WAIT_TIMESTEPS + iti_plot
+    #
+    # axes[-1].set_xlabel("Time [ms]")
+    # spacing = 100
+    # x_ticks_plot = list(range(t_start, time_elapsed, int(ceil(spacing * TIME_FACTOR))))
+    # axes[-1].set_xticks(x_ticks_plot)
 
-    for i in range(num_plots):
-        axes[i].axvspan(t_start, t_start + STIMULUS_TIMESTEPS + WAIT_TIMESTEPS, facecolor=c, alpha=0.3)
-
-    axes[-1].set_xlabel("Time [ms]")
-    spacing = 100
-    x_ticks_plot = list(range(t_start, time_elapsed, int(ceil(spacing * TIME_FACTOR))))
-    axes[-1].set_xticks(x_ticks_plot)
-
-    save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
-    plt.savefig(save_filename)
-    plt.close()
+        save_filename = os.path.join(IMG_DIR, "trial" + str(trial) + ".png")
+        plt.savefig(save_filename)
+        plt.close()
 
 """
 With this script, we should see the plots in the `IMG_DIR`.

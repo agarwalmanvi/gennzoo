@@ -17,8 +17,6 @@ from config.plot_config import plot_rcparams
 
 rcParams.update(plot_rcparams)
 
-# TODO The figures from this script correspond to Figures ... from our submitted paper.
-
 """
 In this script, we are going to recreate the experiment from Fig. 2 (a,b,c) of the Superspike paper.
 In this experiment, one output neuron is trained to output
